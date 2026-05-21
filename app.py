@@ -25,11 +25,18 @@ USO:
 
 import streamlit as st
 import os
+import sys
 import tempfile
 
 from utils import poppler_disponible
 from parsers import PARSERS
 from excel import generar_excel
+
+
+def resource_path(relative_path: str) -> str:
+    """Devuelve la ruta absoluta a un recurso (bundleado o desarrollo)."""
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -73,7 +80,7 @@ def main():
 
     col1, col2 = st.columns([1, 3])
     with col1:
-        st.image("sg.jpg", width=150)
+        st.image(resource_path("sg.jpg"), width=150)
     with col2:
         st.title("Conversor de Extractos Bancarios")
         st.caption("Convertí extractos bancarios en PDF a Excel — Macro, Galicia, Santander, Bancor, BBVA")
