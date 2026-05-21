@@ -1,7 +1,7 @@
 """
 =============================================================================
   CONVERSOR DE EXTRACTOS BANCARIOS A EXCEL — Interfaz Gráfica
-  Bancos soportados: Macro | Galicia | Santander | Bancor
+  Bancos soportados: Macro | Galicia | Santander | Bancor | BBVA
 =============================================================================
 
 INSTALACIÓN (una sola vez):
@@ -30,6 +30,7 @@ import io
 import subprocess
 import tempfile
 import openpyxl
+from dataclasses import dataclass, field
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 
@@ -52,7 +53,7 @@ def pdf_to_text(pdf_path: str, layout: bool = True) -> str:
     )
     if result.returncode != 0:
         raise RuntimeError(
-            f"pdftotext falló para '{pdf_path}'.\n"
+            f"pdftotext falló para \'{pdf_path}\'.\n"
             "Verificá que Poppler esté instalado y en el PATH.\n"
             f"Error: {result.stderr}"
         )
@@ -90,6 +91,18 @@ def normalizar_fecha(fecha_str: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  DIAGNÓSTICO POR PARSER
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class Diagnostico:
+    total_lineas: int = 0
+    lineas_con_fecha: int = 0
+    movimientos_parseados: int = 0
+    lineas_descartadas: list = field(default_factory=list)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  REGISTRO DE PARSERS
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -108,21 +121,28 @@ def registrar_parser(nombre_banco: str):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @registrar_parser("macro")
-def parser_macro(pdf_path: str) -> list:
+def parser_macro(pdf_path: str) -> tuple:
     text = pdf_to_text(pdf_path, layout=True)
     lines = text.split("\n")
     movimientos = []
+    diagnostico = Diagnostico(total_lineas=len(lines))
     re_num = re.compile(r"-?[\d]{1,3}(?:\.[\d]{3})*,\d{2}")
 
-    for line in lines:
+    for line_idx, line in enumerate(lines):
         date_m = re.match(r"^    (\d{2}/\d{2}/\d{2})\s", line)
         if not date_m:
             continue
+        diagnostico.lineas_con_fecha += 1
         fecha = normalizar_fecha(date_m.group(1))
         mes = mes_from_fecha(fecha)
         descripcion = " ".join(line[13:84].split())
         matches = [(m.start(), m.group()) for m in re_num.finditer(line)]
         if not matches:
+            diagnostico.lineas_descartadas.append({
+                "linea_idx": line_idx,
+                "contenido": line[:120],
+                "motivo": "sin montos",
+            })
             continue
         saldo_pos, saldo_str = matches[-1]
         if saldo_pos > 0 and line[saldo_pos - 1] == "-":
@@ -146,7 +166,8 @@ def parser_macro(pdf_path: str) -> list:
             "mes": mes, "fecha": fecha, "descripcion": descripcion,
             "debito": debito, "credito": credito, "saldo": saldo,
         })
-    return movimientos
+        diagnostico.movimientos_parseados += 1
+    return movimientos, diagnostico
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -154,7 +175,7 @@ def parser_macro(pdf_path: str) -> list:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @registrar_parser("galicia")
-def parser_galicia(pdf_path: str) -> list:
+def parser_galicia(pdf_path: str) -> tuple:
     text = pdf_to_text(pdf_path, layout=True)
     lines = text.split("\n")
 
@@ -168,6 +189,7 @@ def parser_galicia(pdf_path: str) -> list:
     ]
 
     movimientos = []
+    diagnostico = Diagnostico(total_lineas=len(lines))
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -175,6 +197,7 @@ def parser_galicia(pdf_path: str) -> list:
         if not m:
             i += 1
             continue
+        diagnostico.lineas_con_fecha += 1
         fecha_str = m.group(1)
         partes = fecha_str.split("/")
         fecha = f"{partes[0]}/{partes[1]}/20{partes[2]}"
@@ -204,8 +227,14 @@ def parser_galicia(pdf_path: str) -> list:
             if not re_num.findall(next_line):
                 descripcion += " " + " ".join(next_line.split())
             j += 1
+        linea_fecha_idx = i
         i = j
         if not nums:
+            diagnostico.lineas_descartadas.append({
+                "linea_idx": linea_fecha_idx,
+                "contenido": line[:120],
+                "motivo": "sin montos",
+            })
             continue
         saldo = parse_num(nums[-1][1])
         debito = credito = None
@@ -220,7 +249,8 @@ def parser_galicia(pdf_path: str) -> list:
             "mes": mes, "fecha": fecha, "descripcion": descripcion.strip(),
             "debito": debito, "credito": credito, "saldo": saldo,
         })
-    return movimientos
+        diagnostico.movimientos_parseados += 1
+    return movimientos, diagnostico
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -228,10 +258,11 @@ def parser_galicia(pdf_path: str) -> list:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @registrar_parser("santander")
-def parser_santander(pdf_path: str) -> list:
+def parser_santander(pdf_path: str) -> tuple:
     text = pdf_to_text(pdf_path, layout=True)
     lines = text.split("\n")
     movimientos = []
+    diagnostico = Diagnostico(total_lineas=len(lines))
     re_fecha_line = re.compile(r"^\s*(\d{2}/\d{2}/\d{2})\s")
     re_monto = re.compile(r"-?\$\s*[\d]{1,3}(?:\.[\d]{3})*,\d{2}")
 
@@ -291,6 +322,7 @@ def parser_santander(pdf_path: str) -> list:
         if not m:
             i += 1
             continue
+        diagnostico.lineas_con_fecha += 1
         fecha = normalizar_fecha(m.group(1))
         mes = mes_from_fecha(fecha)
         montos = [(mt.start(), mt.group()) for mt in re_monto.finditer(line)]
@@ -320,6 +352,11 @@ def parser_santander(pdf_path: str) -> list:
         def limpiar_monto(s):
             return s.replace("$", "").replace(" ", "").strip()
         if not montos:
+            diagnostico.lineas_descartadas.append({
+                "linea_idx": current_line,
+                "contenido": line[:120],
+                "motivo": "sin montos",
+            })
             continue
         saldo = parse_num(limpiar_monto(montos[-1][1]))
         debito = credito = None
@@ -336,7 +373,8 @@ def parser_santander(pdf_path: str) -> list:
             "mes": mes, "fecha": fecha, "descripcion": descripcion,
             "debito": debito, "credito": credito, "saldo": saldo,
         })
-    return movimientos
+        diagnostico.movimientos_parseados += 1
+    return movimientos, diagnostico
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -344,7 +382,7 @@ def parser_santander(pdf_path: str) -> list:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @registrar_parser("bancor")
-def parser_bancor(pdf_path: str) -> list:
+def parser_bancor(pdf_path: str) -> tuple:
     text = pdf_to_text(pdf_path, layout=True)
     lines = text.split("\n")
     anio = None
@@ -356,21 +394,28 @@ def parser_bancor(pdf_path: str) -> list:
     if not anio:
         anio = "2025"
     movimientos = []
+    diagnostico = Diagnostico(total_lineas=len(lines))
     re_num = re.compile(r"-?[\d]{1,3}(?:\.[\d]{3})*,\d{2}")
     re_fecha_line = re.compile(r"^\s+(\d{2}/\d{2})\s+(.+)")
     UMBRAL_DEB_CRED = 140
 
-    for line in lines:
+    for line_idx, line in enumerate(lines):
         if "SALDO RES. ANTERIOR" in line:
             continue
         m = re_fecha_line.match(line)
         if not m:
             continue
+        diagnostico.lineas_con_fecha += 1
         fecha_corta = m.group(1)
         fecha = f"{fecha_corta}/{anio}"
         mes = int(fecha_corta.split("/")[1])
         matches = [(mt.start(), mt.group()) for mt in re_num.finditer(line)]
         if not matches:
+            diagnostico.lineas_descartadas.append({
+                "linea_idx": line_idx,
+                "contenido": line[:120],
+                "motivo": "sin montos",
+            })
             continue
         desc_match = re.match(r"^\s+\d{2}/\d{2}\s+(\d+\s+)?(.+?)\s{2,}", line)
         if desc_match:
@@ -395,7 +440,8 @@ def parser_bancor(pdf_path: str) -> list:
             "mes": mes, "fecha": fecha, "descripcion": descripcion,
             "debito": debito, "credito": credito, "saldo": saldo,
         })
-    return movimientos
+        diagnostico.movimientos_parseados += 1
+    return movimientos, diagnostico
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -403,7 +449,7 @@ def parser_bancor(pdf_path: str) -> list:
 # ─────────────────────────────────────────────────────────────────────────────
 
 @registrar_parser("bbva")
-def parser_bbva(pdf_path: str) -> list:
+def parser_bbva(pdf_path: str) -> tuple:
     text = pdf_to_text(pdf_path, layout=True)
     lines = text.split("\n")
 
@@ -450,6 +496,7 @@ def parser_bbva(pdf_path: str) -> list:
         return anio_fallback
 
     movimientos = []
+    diagnostico = Diagnostico(total_lineas=len(lines))
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -481,6 +528,7 @@ def parser_bbva(pdf_path: str) -> list:
             i += 1
             continue
 
+        diagnostico.lineas_con_fecha += 1
         fecha_corta = m.group(1)  # DD/MM
         mes_num = int(fecha_corta.split("/")[1])
         anio = obtener_anio(mes_num)
@@ -512,6 +560,11 @@ def parser_bbva(pdf_path: str) -> list:
         i += 1
 
         if not nums:
+            diagnostico.lineas_descartadas.append({
+                "linea_idx": i - 1,
+                "contenido": line[:120],
+                "motivo": "sin montos",
+            })
             continue
 
         # Saldo = último número
@@ -530,8 +583,9 @@ def parser_bbva(pdf_path: str) -> list:
             "mes": mes_num, "fecha": fecha, "descripcion": descripcion.strip(),
             "debito": debito, "credito": credito, "saldo": saldo,
         })
+        diagnostico.movimientos_parseados += 1
 
-    return movimientos
+    return movimientos, diagnostico
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -655,7 +709,7 @@ def main():
         st.image("sg.jpg", width=150)
     with col2:
         st.title("Conversor de Extractos Bancarios")
-        st.caption("Convertí extractos bancarios en PDF a Excel — Macro, Galicia, Santander, Bancor")
+        st.caption("Convertí extractos bancarios en PDF a Excel — Macro, Galicia, Santander, Bancor, BBVA")
 
     # ── Verificar Poppler ──
     if not poppler_disponible():
@@ -673,6 +727,8 @@ def main():
     # ── Estado de sesión para acumular hojas ──
     if "hojas" not in st.session_state:
         st.session_state.hojas = {}
+    if "uploader_key" not in st.session_state:
+        st.session_state.uploader_key = 0
 
     st.divider()
 
@@ -697,7 +753,16 @@ def main():
         type=["pdf"],
         accept_multiple_files=True,
         help="Podés subir varios PDFs del mismo banco/cuenta. Se acumulan en la misma hoja.",
+        key=f"pdf_uploader_{st.session_state.uploader_key}",
     )
+
+    # ── Botón para limpiar archivos cargados ──
+    if archivos:
+        _, col_clear = st.columns([3, 1])
+        with col_clear:
+            if st.button("✕ Quitar todos los archivos", use_container_width=True):
+                st.session_state.uploader_key += 1
+                st.rerun()
 
     if st.button("➕ Agregar hoja", type="primary", use_container_width=True):
         if not nombre_hoja.strip():
@@ -708,6 +773,7 @@ def main():
             parser = PARSERS[banco]
             todos_movs = []
             errores = []
+            diagnosticos = []
 
             progress = st.progress(0, text="Procesando PDFs...")
             for idx, archivo in enumerate(archivos):
@@ -717,9 +783,13 @@ def main():
                         tmp.write(archivo.read())
                         tmp_path = tmp.name
 
-                    movs = parser(tmp_path)
-                    todos_movs.extend(movs)
-                    os.unlink(tmp_path)
+                    try:
+                        movs, diag = parser(tmp_path)
+                        todos_movs.extend(movs)
+                        diagnosticos.append((archivo.name, banco, diag))
+                    finally:
+                        if os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
 
                 except Exception as e:
                     errores.append(f"{archivo.name}: {e}")
@@ -734,6 +804,63 @@ def main():
             if errores:
                 for err in errores:
                     st.error(f"❌ {err}")
+
+            # ── Diagnóstico (collapsible) ──
+            if diagnosticos:
+                with st.expander("📋 Diagnóstico de procesamiento"):
+                    for nombre_archivo, banco_nombre, diag in diagnosticos:
+                        total = diag.total_lineas
+                        con_fecha = diag.lineas_con_fecha
+                        parseados = diag.movimientos_parseados
+                        descartadas = len(diag.lineas_descartadas)
+                        porcentaje = (descartadas / con_fecha * 100) if con_fecha else 0.0
+
+                        st.caption(
+                            f"📊 Diagnóstico ({nombre_archivo}): {total} líneas · "
+                            f"{con_fecha} con fecha · {parseados} movimientos · "
+                            f"{descartadas} descartadas ({porcentaje:.1f}%)"
+                        )
+
+                        if porcentaje > 5.0:
+                            st.warning(
+                                f"⚠️ Se descartaron {descartadas} de {con_fecha} líneas con fecha "
+                                f"({porcentaje:.1f}%) en {nombre_archivo}. Revisá el log de diagnóstico."
+                            )
+                            with st.expander("Ver líneas descartadas"):
+                                for d in diag.lineas_descartadas:
+                                    st.text(
+                                        f"Línea {d['linea_idx']}: [{d['motivo']}] \"{d['contenido']}\""
+                                    )
+
+                    # ── Botón de descarga del log (siempre que haya diagnósticos) ──
+                    log_lines = []
+                    for nombre_archivo, banco_nombre, diag in diagnosticos:
+                        total = diag.total_lineas
+                        con_fecha = diag.lineas_con_fecha
+                        parseados = diag.movimientos_parseados
+                        descartadas = len(diag.lineas_descartadas)
+                        porcentaje = (descartadas / con_fecha * 100) if con_fecha else 0.0
+                        log_lines.append(f"=== Diagnóstico: {nombre_archivo} ===")
+                        log_lines.append(f"Banco: {banco_nombre}")
+                        log_lines.append(f"Líneas totales: {total}")
+                        log_lines.append(f"Líneas con fecha: {con_fecha}")
+                        log_lines.append(f"Movimientos parseados: {parseados}")
+                        log_lines.append(f"Líneas descartadas: {descartadas} ({porcentaje:.1f}%)")
+                        log_lines.append("")
+                        if diag.lineas_descartadas:
+                            log_lines.append("Líneas descartadas:")
+                            for d in diag.lineas_descartadas:
+                                log_lines.append(
+                                    f"  Línea {d['linea_idx']}: [{d['motivo']}] \"{d['contenido']}\""
+                                )
+                            log_lines.append("")
+                    log_txt = "\n".join(log_lines)
+                    st.download_button(
+                        label="📋 Descargar log de diagnóstico",
+                        data=log_txt,
+                        file_name="diagnostico_extractos.txt",
+                        mime="text/plain",
+                    )
 
             if todos_movs:
                 # Ordenar cronológicamente (stable sort preserva orden interno de cada PDF)
@@ -809,7 +936,7 @@ def main():
     # ── Footer ──
     st.divider()
     st.caption(
-        "Bancos soportados: Macro · Galicia · Santander · Bancor &nbsp;|&nbsp; "
+        "Bancos soportados: Macro · Galicia · Santander · Bancor · BBVA &nbsp;|&nbsp; "
         "Requiere Poppler instalado"
     )
 
