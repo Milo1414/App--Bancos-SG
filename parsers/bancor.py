@@ -3,7 +3,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 import re
-from utils import pdf_to_text, parse_num
+from utils import pdf_to_text, parse_num, extraer_saldo_inicial
 from parsers import registrar_parser
 
 
@@ -68,4 +68,9 @@ def parser_bancor(pdf_path: str) -> tuple:
             "debito": debito, "credito": credito, "saldo": saldo,
         })
         diagnostico.movimientos_parseados += 1
+    saldo_ini = extraer_saldo_inicial(lines)
+    if saldo_ini is not None:
+        for m in movimientos:
+            m["saldo_inicial"] = saldo_ini
+
     return movimientos, diagnostico
