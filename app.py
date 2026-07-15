@@ -1,7 +1,7 @@
 """
 =============================================================================
   CONVERSOR DE EXTRACTOS BANCARIOS A EXCEL — Interfaz Gráfica
-  Bancos soportados: Macro | Galicia | Santander | Bancor | BBVA
+  Bancos soportados: Macro | Galicia | Santander | Bancor | BBVA | Nación
 =============================================================================
 
 INSTALACIÓN (una sola vez):
@@ -30,6 +30,43 @@ import tempfile
 from utils import poppler_disponible
 from parsers import PARSERS
 from excel import generar_excel
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  CONFIGURACIÓN DE BANCOS
+#  Cada clave coincide con el parser registrado en PARSERS.
+#  "display": nombre que se muestra en el selector.
+#  "imagen":  captura de cómo se ve el inicio del extracto (o None si no hay).
+#  Un banco puede tener más de un formato → futuras versiones (ej. MacroV2).
+# ─────────────────────────────────────────────────────────────────────────────
+
+CAPTURAS_DIR = os.path.join("public", "Captura bancos")
+
+BANCOS = {
+    "macro":     {"display": "MacroV1",  "imagen": "MacroV1.PNG"},
+    "galicia":   {"display": "Galicia",  "imagen": "Galicia.PNG"},
+    "santander": {"display": "Santander", "imagen": "Santander.PNG"},
+    "bancor":    {"display": "Bancor",   "imagen": "Bancor.PNG"},
+    "bbva":      {"display": "BBVA",     "imagen": "BBVA.PNG"},
+    "nacion":    {"display": "Nación",   "imagen": "Nacion.PNG"},
+}
+
+
+def display_banco(clave: str) -> str:
+    """Nombre a mostrar en el selector para una clave de parser."""
+    info = BANCOS.get(clave)
+    if info:
+        return info["display"]
+    return "BBVA" if clave.lower() == "bbva" else clave.capitalize()
+
+
+def captura_banco(clave: str):
+    """Ruta a la captura del banco, o None si no existe el archivo."""
+    info = BANCOS.get(clave)
+    if not info or not info.get("imagen"):
+        return None
+    ruta = os.path.join(CAPTURAS_DIR, info["imagen"])
+    return ruta if os.path.exists(ruta) else None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -76,7 +113,7 @@ def main():
         st.image("sg.jpg", width=150)
     with col2:
         st.title("Conversor de Extractos Bancarios")
-        st.caption("Convertí extractos bancarios en PDF a Excel — Macro, Galicia, Santander, Bancor, BBVA")
+        st.caption("Convertí extractos bancarios en PDF a Excel — Macro, Galicia, Santander, Bancor, BBVA, Nación")
 
     # ── Verificar Poppler ──
     if not poppler_disponible():
@@ -107,12 +144,21 @@ def main():
         banco = st.selectbox(
             "Banco",
             options=list(PARSERS.keys()),
-            format_func=lambda x: "BBVA" if x.lower() == "bbva" else x.capitalize(),
+            format_func=display_banco,
         )
     with col2:
         nombre_hoja = st.text_input(
             "Nombre de la hoja",
             max_chars=31,
+        )
+
+    # ── Previsualización del banco elegido ──
+    captura = captura_banco(banco)
+    if captura:
+        st.image(
+            captura,
+            caption=f"Vista previa — así se ve el inicio del extracto de {display_banco(banco)}",
+            use_container_width=True,
         )
 
     archivos = st.file_uploader(
@@ -236,13 +282,39 @@ def main():
                     return (int(partes[2]), int(partes[1]), int(partes[0]))
                 todos_movs.sort(key=fecha_sort_key)
 
-                sheet_name = nombre_hoja.strip()[:31]
-                st.session_state.hojas[sheet_name] = todos_movs
-                st.markdown(
-                    f'<div class="success-box">✅ <strong>{sheet_name}</strong>: '
-                    f'{len(todos_movs):,} movimientos de {len(archivos)} PDF(s)</div>',
-                    unsafe_allow_html=True,
-                )
+                base_name = nombre_hoja.strip()
+
+                # Para BBVA: si hay más de una cuenta en el lote, crear una hoja por cuenta
+                if banco == "bbva":
+                    from collections import defaultdict
+                    movs_por_cuenta = defaultdict(list)
+                    for mov in todos_movs:
+                        movs_por_cuenta[mov.get("cuenta", "")].append(mov)
+                else:
+                    movs_por_cuenta = {"": todos_movs}
+
+                if banco == "bbva" and len(movs_por_cuenta) > 1:
+                    hojas_agregadas = []
+                    for cuenta, movs in movs_por_cuenta.items():
+                        # "267-015530/5" → "15530/5"
+                        partes_cta = cuenta.split("-")
+                        sufijo = f"{int(partes_cta[-1].split('/')[0])}-{partes_cta[-1].split('/')[-1]}" if "/" in cuenta else cuenta
+                        sheet_name = f"{base_name} - {sufijo}"[:31]
+                        st.session_state.hojas[sheet_name] = movs
+                        hojas_agregadas.append((sheet_name, len(movs)))
+                    resumen = " · ".join(f"<strong>{n}</strong> ({c:,})" for n, c in hojas_agregadas)
+                    st.markdown(
+                        f'<div class="success-box">✅ {resumen} — {len(archivos)} PDF(s)</div>',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    sheet_name = base_name[:31]
+                    st.session_state.hojas[sheet_name] = todos_movs
+                    st.markdown(
+                        f'<div class="success-box">✅ <strong>{sheet_name}</strong>: '
+                        f'{len(todos_movs):,} movimientos de {len(archivos)} PDF(s)</div>',
+                        unsafe_allow_html=True,
+                    )
             elif not errores:
                 st.warning("No se encontraron movimientos en los PDFs subidos.")
 
@@ -303,7 +375,7 @@ def main():
     # ── Footer ──
     st.divider()
     st.caption(
-        "Bancos soportados: Macro · Galicia · Santander · Bancor · BBVA &nbsp;|&nbsp; "
+        "Bancos soportados: Macro · Galicia · Santander · Bancor · BBVA · Nación &nbsp;|&nbsp; "
         "Requiere Poppler instalado"
     )
 

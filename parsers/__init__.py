@@ -13,4 +13,4 @@ def registrar_parser(nombre_banco: str):
 
 
 # Importar todos los módulos para que se registren automáticamente
-from . import macro, galicia, santander, bancor, bbva
+from . import macro, galicia, santander, bancor, bbva, nacion

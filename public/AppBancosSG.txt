@@ -1,0 +1,17 @@
+App Bancos SG
+
+- Falla santander, ejemplo abril-25 Las flores (anota gastos al ultimo sin sentido)
+
+- Agregar mas bancos como Macro v2 etc y poner un snapshot de como seria el inicio del pdf de ese banco
+
+- Identificador de cuentas Resumenes macro
+
+- Bug galicia, se pega el siguiente texto :  Los depósitos en pesos y en moneda extranjera cuentan con la garantía de hasta $25.000.000. En las operaciones a nombre de dos o más personas, la garantía se prorrateará entre sus titulares. En ningún caso, el total de la garantía por persona y por depósito podrá exceder de $25.000.000, cualquiera sea el número de cuentas y/o depósitos. Ley 24.485, Decreto N' 540/95 y modificatorios y Com. A 2337 y sus modificatorias y complementarias. Se encuentran excluidos los captados a tasas superiores a la de referencia conforme a los límites establecidos por el Banco Central, los adquiridos por endoso y los efectuados por personas vinculadas a la entidad financiera. Los totales mensuales de Retención Impuesto Ley 25.413 mencionados pueden ser modificados por devoluciones o ajustes. Al completa esta hoja pueden quedar operaciones sin registrar. Canales de atención Ingresá a "Ayudas para tus dudas" desde bancogalicia.com Chateá por Whatsapp 24/7 al +54 9 11 4439-8558 Llamanos a Fonobanco para consultas sobre tus claves, tarjetas, cuentas y otros productos. Para todo el país, 0810-444-6500. Usted puede consultar el "Régimen de Transparencia" elaborado por el Banco Central sobre la base de la información proporcionada por los sujetos obligados a fin de comparar los costos y características de los productos y servicios financieros ingresando a http://www.bcra.gob.ar/BCRAyVos/Regimen_de_transparencia.asp.
+
+-No funcina el nombre del archivo, es decir, cuando le pones un nombre al archivo cuando lo guardas se pone el predeterminado
+
+- BBVA no agarra ciertos valores, ej file:///C:/Users/camil/Desktop/Portofino/2024/PortoFino2024/062024portofino.pdf
+
+- Desde la app cuando le pones el nombre a la hoja realmente no se aplica
+
+

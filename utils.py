@@ -2,6 +2,7 @@
 #  UTILIDADES COMUNES
 # ─────────────────────────────────────────────────────────────────────────────
 
+import re
 import subprocess
 from dataclasses import dataclass, field
 
@@ -44,6 +45,25 @@ def parse_num(s: str):
         return -val if negative else val
     except ValueError:
         return None
+
+
+_RE_SALDO_INICIAL = re.compile(r"saldo\s+(?:res\.?\s+)?(?:anterior|inicial)", re.IGNORECASE)
+_RE_MONTO_SALDO   = re.compile(r"-?\$?\s*\d{1,3}(?:\.\d{3})*,\d{2}-?")
+
+
+def extraer_saldo_inicial(lines):
+    """
+    Busca la línea de 'Saldo Anterior' / 'Saldo Inicial' del extracto y devuelve
+    el último importe de esa línea (que es el saldo), o None si no la encuentra.
+    Es el saldo inicial que informa el banco; se usa como semilla para la fila
+    'SALDO INICIAL' del Excel. (Galicia no la rotula → devuelve None.)
+    """
+    for line in lines:
+        if _RE_SALDO_INICIAL.search(line):
+            nums = _RE_MONTO_SALDO.findall(line)
+            if nums:
+                return parse_num(nums[-1])
+    return None
 
 
 def mes_from_fecha(fecha_str: str) -> int:
