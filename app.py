@@ -150,6 +150,7 @@ def main():
         nombre_hoja = st.text_input(
             "Nombre de la hoja",
             max_chars=31,
+            key="nombre_hoja",
         )
 
     # ── Previsualización del banco elegido ──
@@ -352,8 +353,10 @@ def main():
         nombre_archivo = st.text_input(
             "Nombre del archivo Excel",
             value="extractos_bancarios.xlsx",
+            key="nombre_archivo",
         )
-        if not nombre_archivo.endswith(".xlsx"):
+        nombre_archivo = nombre_archivo.strip() or "extractos_bancarios.xlsx"
+        if not nombre_archivo.lower().endswith(".xlsx"):
             nombre_archivo += ".xlsx"
 
         col_dl, col_clear = st.columns([3, 1])

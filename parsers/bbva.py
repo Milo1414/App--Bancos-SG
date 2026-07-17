@@ -9,17 +9,17 @@ from parsers import registrar_parser
 
 @registrar_parser("bbva")
 def parser_bbva(pdf_path: str) -> tuple:
-    text = pdf_to_text(pdf_path, layout=True)
+    text = pdf_to_text(pdf_path, table=True)
     lines = text.split("\n")
 
     re_fecha = re.compile(r"^\s*(\d{2}/\d{2})\s+(.+)")
     re_num   = re.compile(r"-?[\d]{1,3}(?:\.[\d]{3})*,\d{2}")
 
-    # Detecta inicio de sección de cuenta:
-    # "CC $ 267-015530/5 (Cta.Cte.Bancaria) - Iva-Responsable Inscripto"
-    # "CC U$S 267-401531/5 (Cta.Cte.Bancaria) - Iva-Responsable Inscripto"
+    # Detecta inicio de sección de cuenta y su MONEDA (grupo 1):
+    # "CC $ 267-015530/5 (Cta.Cte.Bancaria) - Iva-Responsable Inscripto"   → $
+    # "CC U$S 267-401531/5 (Cta.Cte.Bancaria) - Iva-Responsable Inscripto" → U$S
     re_cuenta = re.compile(
-        r"CC\s+[\$U\$S]+\s+([\d\-]+/\d+)\s+\(Cta\.Cte\.Bancaria\)\s+-\s+Iva",
+        r"CC\s+(U\$S|\$)\s+([\d\-]+/\d+)\s+\(Cta\.Cte\.Bancaria\)\s+-\s+Iva",
         re.IGNORECASE,
     )
 
@@ -76,7 +76,8 @@ def parser_bbva(pdf_path: str) -> tuple:
     from utils import Diagnostico
     diagnostico = Diagnostico(total_lineas=len(lines))
 
-    cuenta_activa = None  # número de cuenta actual (ej: "267-015530/5")
+    cuenta_activa = None   # número de cuenta actual (ej: "267-015530/5")
+    cuenta_es_usd = False  # True mientras la cuenta activa sea en dólares
     fin_extracto  = False
     saldo_ini_por_cuenta = {}  # cuenta → saldo anterior (saldo inicial) informado
 
@@ -86,7 +87,7 @@ def parser_bbva(pdf_path: str) -> tuple:
         "Sobre (", "Página", "Banco BBVA",
         "Resumen", "Pymes y Negocios", "Cuentas y paquetes",
         "OCASA", "TIERRA", "PRES HIPOLITO", "DIGITAL", "OCRCU",
-        "Cuenta Pyme", "CONSOLIDADO", "MANTENIMIENTO", "MOVIMIENTOS",
+        "Cuenta Pyme", "CONSOLIDADO", "MANTENIMIENTO",
         "BONIFICACIONES", "CUENTA DÉBITO", "Cta.Cte.Bancaria",
         "Intervinientes", "CBU ", "Sucursal gestora", "DETALLE",
         "Movimientos en cuentas", "Saldo Consolidado",
@@ -111,15 +112,16 @@ def parser_bbva(pdf_path: str) -> tuple:
         # ── Detectar cambio de sección de cuenta ──
         mc = re_cuenta.search(stripped)
         if mc:
-            cuenta_activa = mc.group(1)
+            cuenta_es_usd = mc.group(1).upper().startswith("U")
+            cuenta_activa = mc.group(2)
             continue
 
         # Saltear líneas sin cuenta activa (cabecera del PDF)
         if cuenta_activa is None:
             continue
 
-        # Saltear cuenta en dólares (no la procesamos)
-        if cuenta_activa.startswith("401"):
+        # Saltear la cuenta en dólares (no la procesamos)
+        if cuenta_es_usd:
             continue
 
         # Saltear vacías

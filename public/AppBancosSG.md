@@ -20,25 +20,27 @@
     cambio de saldo (no tiene encabezado y las columnas se corren entre páginas).
   - **Verificado** contra los PDF de `public/Bancos/`: `Diferencia = 0` en todas las filas
     (Bancor feb-2026 solo débitos, Bancor mar-2025 con débitos y créditos, Nación, Santander).
+- **Fix Galicia y BBVA por `-table`** *(este trabajo)*:
+  - **Galicia**: pasó a `-table`; ya no pega texto legal (corta en `Total`/`Consolidado`),
+    saldo inicial tomado del encabezado "Saldos". Verificado: **14 movimientos, Diferencia 0**
+    (antes 5 y no reconciliaba).
+  - **BBVA**: pasó a `-table`; se arregló el filtro de la cuenta en dólares (ahora detecta la
+    moneda `CC U$S` vs `CC $`) y se quitó `MOVIMIENTOS` de la lista de descarte (descartaba
+    "COMISION POR MOVIMIENTOS"). Verificado: cuenta pesos **10 movimientos, Diferencia 0**,
+    cuenta USD excluida.
+- **Santander "Las flores" abril-25 verificado**: con `-table` da **288 movimientos,
+  Diferencia 0**. Resuelto.
 
 ## 🔧 Pendiente
-
-### Parsers / extracción
-- **Santander abril-25 "Las flores"** — anotaba gastos al final sin sentido.
-  *Probablemente resuelto* con el pasaje a `-table`; **falta re-testear** con ese PDF puntual
-  (`public/Resumen Las flores abril 2025.pdf`).
-- **Bug Galicia** — se pega texto legal como si fuera un movimiento (bloque de garantía de
-  depósitos / canales de atención). Además Galicia **no reconcilia** (`Diferencia ≠ 0`) y no
-  rotula saldo inicial (se deriva).
-- **BBVA no agarra ciertos valores** — ej. `062024portofino.pdf`. No reconcilia por cuenta;
-  además el filtro de la cuenta en dólares está roto (`cuenta.startswith("401")` chequea el
-  string completo que arranca en `267-`, así que nunca la saltea).
-- **Más bancos / formatos** — agregar formatos como **Macro v2**, con su captura de inicio del PDF.
-- **Identificador de cuentas** en resúmenes **Macro**.
 
 ### App (UI)
 - **Nombre del archivo al guardar** no se aplica (queda el predeterminado).
 - **Nombre de la hoja** cargado desde la app no se aplica realmente.
+  *(Requiere reproducir en la app corriendo; ver plan Fase B.)*
+
+### Parsers / extracción (para después)
+- **Más bancos / formatos** — agregar formatos como **Macro v2**, con su captura de inicio del PDF.
+- **Identificador de cuentas** en resúmenes **Macro**.
 
 ---
 *Nota: los ítems de Macro (v2, identificador de cuenta) quedaron explícitamente "para después".*
