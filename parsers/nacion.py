@@ -9,7 +9,7 @@ from parsers import registrar_parser
 
 @registrar_parser("nacion")
 def parser_nacion(pdf_path: str) -> tuple:
-    text = pdf_to_text(pdf_path, layout=True)
+    text = pdf_to_text(pdf_path, table=True)
     lines = text.split("\n")
 
     # Detect year from PERIODO line
@@ -23,7 +23,9 @@ def parser_nacion(pdf_path: str) -> tuple:
         anio = "2025"
 
     re_num = re.compile(r"-?[\d]{1,3}(?:\.[\d]{3})*,\d{2}-?")
-    re_fecha_line = re.compile(r"^\s*(\d{2}/\d{2}/\d{2})\s+(.+)")
+    # Nota: -table a veces antepone '____' en el margen izquierdo (sin correr
+    # las columnas), por eso el regex acepta [\s_]* al inicio.
+    re_fecha_line = re.compile(r"^[\s_]*(\d{2}/\d{2}/\d{2})\s+(.+)")
 
     # Dynamic threshold detection from header lines
     page_thresholds = []
