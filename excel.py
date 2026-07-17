@@ -3,6 +3,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 import io
+import re
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -27,6 +28,24 @@ def generar_excel(hojas: dict) -> bytes:
     if wb.sheetnames == ["Sheet"]:
         del wb["Sheet"]
 
+    # openpyxl no acepta en el título de hoja los caracteres  \ / * ? : [ ]
+    # ni títulos vacíos o > 31 chars, y no permite duplicados. Se sanea el
+    # nombre que puso el usuario para que se aplique igual (sin romper).
+    _usados = set()
+
+    def _titulo_hoja(nombre: str) -> str:
+        limpio = re.sub(r"[\\/*?:\[\]]", "-", (nombre or "").strip())[:31].strip()
+        if not limpio:
+            limpio = "Hoja"
+        base = limpio
+        n = 2
+        while limpio.lower() in _usados:
+            sufijo = f" ({n})"
+            limpio = base[:31 - len(sufijo)] + sufijo
+            n += 1
+        _usados.add(limpio.lower())
+        return limpio
+
     header_fill = PatternFill("solid", fgColor="1F4E79")
     header_font = Font(name="Arial", bold=True, color="FFFFFF", size=10)
     data_font   = Font(name="Arial", size=9)
@@ -48,7 +67,7 @@ def generar_excel(hojas: dict) -> bytes:
     COL_CUENTA = 10
 
     for sheet_name, txs in hojas.items():
-        ws = wb.create_sheet(title=sheet_name[:31])
+        ws = wb.create_sheet(title=_titulo_hoja(sheet_name))
 
         tiene_cuenta = any(tx.get("cuenta") for tx in txs)
         headers = list(headers_base)
