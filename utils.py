@@ -7,10 +7,19 @@ import subprocess
 from dataclasses import dataclass, field
 
 
-def pdf_to_text(pdf_path: str, layout: bool = True) -> str:
-    """Convierte un PDF a texto usando pdftotext (requiere Poppler)."""
+def pdf_to_text(pdf_path: str, layout: bool = True, table: bool = False) -> str:
+    """Convierte un PDF a texto usando pdftotext (Xpdf/Poppler).
+
+    modo:
+      - table=True   → 'pdftotext -table' (optimizado para tablas: alinea bien
+                       las columnas Débito/Crédito/Saldo de los extractos que
+                       -layout desalinea, ej. Bancor, Nación, Santander).
+      - layout=True  → 'pdftotext -layout' (por defecto; el resto de los bancos).
+    """
     args = ["pdftotext"]
-    if layout:
+    if table:
+        args.append("-table")
+    elif layout:
         args.append("-layout")
     args += [pdf_path, "-"]
     result = subprocess.run(

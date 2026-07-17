@@ -1,6 +1,19 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #  PARSER: BANCOR
 # ─────────────────────────────────────────────────────────────────────────────
+#
+#  Se usa `pdftotext -table` (no -layout): en Bancor -layout desplaza el importe
+#  a la línea del movimiento anterior. Con -table cada movimiento queda en UNA
+#  línea: FECHA  DESCRIPCION  IMPORTE  SALDO, y los saldos reconcilian.
+#
+#  Débito vs Crédito: Bancor NO imprime encabezado de columnas y, además, las
+#  columnas se corren entre páginas, así que clasificar por posición x no es
+#  confiable (rompe en extractos con créditos). El importe SIEMPRE se lee tal
+#  cual del PDF; para decidir en qué columna va se usa el signo del cambio de
+#  saldo respecto de la fila anterior: si el saldo sube es Crédito, si baja es
+#  Débito (definición contable). La columna "Diferencia" del Excel sigue siendo
+#  el verificador: usa el importe leído (no el delta), así que si el importe
+#  impreso no coincide con el movimiento del saldo, la diferencia lo delata.
 
 import re
 from utils import pdf_to_text, parse_num, extraer_saldo_inicial
@@ -9,7 +22,7 @@ from parsers import registrar_parser
 
 @registrar_parser("bancor")
 def parser_bancor(pdf_path: str) -> tuple:
-    text = pdf_to_text(pdf_path, layout=True)
+    text = pdf_to_text(pdf_path, table=True)
     lines = text.split("\n")
     anio = None
     for line in lines[:50]:
@@ -24,7 +37,11 @@ def parser_bancor(pdf_path: str) -> tuple:
     diagnostico = Diagnostico(total_lineas=len(lines))
     re_num = re.compile(r"-?[\d]{1,3}(?:\.[\d]{3})*,\d{2}")
     re_fecha_line = re.compile(r"^\s+(\d{2}/\d{2})\s+(.+)")
-    UMBRAL_DEB_CRED = 140
+
+    # Saldo inicial informado (SALDO RES. ANTERIOR): semilla para clasificar el
+    # primer movimiento por el signo del cambio de saldo.
+    saldo_ini = extraer_saldo_inicial(lines)
+    saldo_prev = saldo_ini
 
     for line_idx, line in enumerate(lines):
         if "SALDO RES. ANTERIOR" in line:
@@ -44,31 +61,31 @@ def parser_bancor(pdf_path: str) -> tuple:
                 "motivo": "sin montos",
             })
             continue
-        desc_match = re.match(r"^\s+\d{2}/\d{2}\s+(\d+\s+)?(.+?)\s{2,}", line)
-        if desc_match:
-            descripcion = desc_match.group(2).strip()
-            descripcion = re.sub(r"\s+\d{4,}\s*$", "", descripcion).strip()
-        else:
-            first_num = re_num.search(line)
-            raw = line[:first_num.start()] if first_num else line
-            descripcion = re.sub(r"^\s+\d{2}/\d{2}\s+", "", raw).strip()
-            descripcion = " ".join(descripcion.split())
+        # Descripción: texto entre la fecha y el primer número.
+        first_num_pos = matches[0][0]
+        descripcion = re.sub(r"^\s*\d{2}/\d{2}\s+", "", line[:first_num_pos]).strip()
+        descripcion = " ".join(descripcion.split())
+
         saldo = parse_num(matches[-1][1])
         debito = credito = None
         if len(matches) >= 2:
-            pos2 = matches[-2][0]
             val2 = parse_num(matches[-2][1])
             if val2 is not None:
-                if pos2 < UMBRAL_DEB_CRED:
-                    debito = abs(val2)
+                importe = abs(val2)
+                # Clasificar por el signo del cambio de saldo (Crédito sube,
+                # Débito baja). Si no hay saldo previo, se asume Débito.
+                if saldo_prev is not None and saldo is not None and saldo >= saldo_prev:
+                    credito = importe
                 else:
-                    credito = abs(val2)
+                    debito = importe
+        if saldo is not None:
+            saldo_prev = saldo
         movimientos.append({
             "mes": mes, "fecha": fecha, "descripcion": descripcion,
             "debito": debito, "credito": credito, "saldo": saldo,
         })
         diagnostico.movimientos_parseados += 1
-    saldo_ini = extraer_saldo_inicial(lines)
+
     if saldo_ini is not None:
         for m in movimientos:
             m["saldo_inicial"] = saldo_ini
