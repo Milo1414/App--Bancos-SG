@@ -2,9 +2,37 @@
 #  UTILIDADES COMUNES
 # ─────────────────────────────────────────────────────────────────────────────
 
+import os
 import re
+import stat
+import sys
 import subprocess
 from dataclasses import dataclass, field
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  RESOLUCIÓN DEL EJECUTABLE pdftotext (Xpdf)
+#  - En el servidor Linux (Streamlit Cloud) se usa el binario de Xpdf 4.06
+#    incluido en el repo (bin/pdftotext), porque el modo `-table` es exclusivo
+#    de Xpdf y NO existe en el pdftotext de Poppler que traen los servidores.
+#  - En Windows/Mac (desarrollo local) se usa el `pdftotext` del PATH.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_BUNDLED = os.path.join(_HERE, "bin", "pdftotext")
+
+
+def _pdftotext_cmd() -> str:
+    """Devuelve la ruta al ejecutable pdftotext a usar."""
+    if sys.platform.startswith("linux") and os.path.exists(_BUNDLED):
+        # Asegurar permiso de ejecución (git no siempre preserva el bit +x)
+        try:
+            st_mode = os.stat(_BUNDLED).st_mode
+            os.chmod(_BUNDLED, st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        except OSError:
+            pass
+        return _BUNDLED
+    return "pdftotext"
 
 
 def pdf_to_text(pdf_path: str, layout: bool = True, table: bool = False) -> str:
@@ -16,7 +44,7 @@ def pdf_to_text(pdf_path: str, layout: bool = True, table: bool = False) -> str:
                        -layout desalinea, ej. Bancor, Nación, Santander).
       - layout=True  → 'pdftotext -layout' (por defecto; el resto de los bancos).
     """
-    args = ["pdftotext"]
+    args = [_pdftotext_cmd()]
     if table:
         args.append("-table")
     elif layout:
@@ -106,7 +134,7 @@ class Diagnostico:
 def poppler_disponible() -> bool:
     try:
         result = subprocess.run(
-            ["pdftotext", "-v"],
+            [_pdftotext_cmd(), "-v"],
             capture_output=True, text=True,
         )
         return True

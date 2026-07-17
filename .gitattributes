@@ -1,0 +1,7 @@
+# El ejecutable de Xpdf es binario: git NO debe tocar sus saltos de línea.
+bin/pdftotext binary
+bin/* binary
+*.jpg binary
+*.png binary
+*.PNG binary
+*.pdf binary
