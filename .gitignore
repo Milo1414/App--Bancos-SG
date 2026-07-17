@@ -1,0 +1,11 @@
+# Secretos (contraseña de la app) — NUNCA subir al repo
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Archivos temporales / de salida
+*.xlsx
+!INSTRUCCIONES*.xlsx
