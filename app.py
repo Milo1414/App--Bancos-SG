@@ -45,6 +45,7 @@ CAPTURAS_DIR = os.path.join("public", "Captura bancos")
 
 BANCOS = {
     "macro":     {"display": "MacroV1",  "imagen": "MacroV1.PNG"},
+    "macrov2":   {"display": "MacroV2",  "imagen": "MacroV2.PNG"},
     "galicia":   {"display": "Galicia",  "imagen": "Galicia.PNG"},
     "santander": {"display": "Santander", "imagen": "Santander.PNG"},
     "bancor":    {"display": "Bancor",   "imagen": "Bancor.PNG"},
