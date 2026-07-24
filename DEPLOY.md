@@ -1,8 +1,11 @@
 # Publicar la app en internet (Streamlit Community Cloud)
 
-Guía para poner el Conversor de Extractos online, **gratis**, con **login por
-contraseña** y **sin guardar los archivos** de nadie. Los usuarios finales solo
-necesitan una **URL** y la **contraseña** — no instalan nada.
+Guía para poner el Conversor de Extractos online, **gratis** y **sin guardar los
+archivos** de nadie. Los usuarios finales solo necesitan una **URL** — no
+instalan nada.
+
+> ⚠️ **La app no tiene contraseña.** Cualquiera con la URL puede usarla. Tratá
+> el link como si fuera privado y no lo publiques.
 
 > **Por qué Streamlit Cloud y no Vercel:** la app es Python/Streamlit (corre un
 > servidor), y Vercel está pensado para otro tipo de webs. Streamlit Community
@@ -47,19 +50,8 @@ git push origin v2
    - **Repository:** `Milo1414/App--Bancos-SG`
    - **Branch:** `v2` (o `main` si mergeaste)
    - **Main file path:** `app.py`
-4. **NO hagas deploy todavía** → abrí **"Advanced settings"**.
 
-## Paso 3 — Poner la contraseña (Secrets)
-
-En **Advanced settings → Secrets**, pegá esto (cambiá la contraseña):
-
-```toml
-app_password = "ELEGÍ-UNA-CONTRASEÑA-FUERTE"
-```
-
-Guardá. Esta contraseña **no queda en el repo**, solo acá.
-
-## Paso 4 — Deploy
+## Paso 3 — Deploy
 
 Click en **"Deploy"**. La primera vez tarda unos minutos (instala Python,
 `streamlit`, `openpyxl` y la librería `libfontconfig1`). Cuando termina, te da
@@ -69,18 +61,34 @@ una URL tipo:
 https://app-bancos-sg.streamlit.app
 ```
 
-## Paso 5 — Compartir
+## Paso 4 — Compartir
 
-Mandales a las personas **la URL + la contraseña**. Abren el link, escriben la
-contraseña y usan la app igual que en tu compu: eligen banco, suben PDFs,
-descargan el Excel.
+Mandales a las personas **la URL**. Abren el link y usan la app igual que en tu
+compu: eligen banco, suben PDFs, descargan el Excel.
 
 ---
 
-## Cambiar la contraseña más adelante
+## Volver a poner contraseña
 
-Streamlit Cloud → tu app → **⋮ / Settings → Secrets** → editás `app_password` →
-Save. Se reinicia sola.
+El login por contraseña compartida vivía en `auth.py` y se sacó a pedido. Para
+recuperarlo:
+
+```bash
+git show 501c17e:auth.py > auth.py
+```
+
+Después, en `app.py`, importar `requiere_login` y agregar al inicio de `main()`:
+
+```python
+if not requiere_login():
+    st.stop()
+```
+
+Y cargar la contraseña en Streamlit Cloud → **⋮ / Settings → Secrets**:
+
+```toml
+app_password = "ELEGÍ-UNA-CONTRASEÑA-FUERTE"
+```
 
 ## Actualizar la app (cuando cambies el código)
 

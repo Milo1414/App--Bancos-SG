@@ -31,7 +31,6 @@ import tempfile
 from utils import motores_faltantes
 from parsers import PARSERS
 from excel import generar_excel
-from auth import requiere_login
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -153,10 +152,6 @@ def main():
         page_icon="🏦",
         layout="centered",
     )
-
-    # ── Login (contraseña compartida). Frena el render si no está autenticado. ──
-    if not requiere_login():
-        st.stop()
 
     # ── Estilos ──
     st.markdown("""
