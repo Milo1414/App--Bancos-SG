@@ -24,6 +24,7 @@ USO:
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 import tempfile
 
@@ -68,6 +69,56 @@ def display_banco(clave: str) -> str:
     if info:
         return info["display"]
     return "BBVA" if clave.lower() == "bbva" else clave.capitalize()
+
+
+def _fijar_scroll_desplegable():
+    """Evita que el desplegable del selector "pierda" el primer banco.
+
+    La lista de opciones es virtualizada (react-window): sólo dibuja los ítems
+    del rango que cree visible. Al abrirla, Streamlit le pasa un
+    `initialScrollOffset` para centrar la opción ya elegida; con Nación (la
+    última de 7) ese cálculo da 120px. Pero las 7 opciones entran justas en el
+    contenedor (280px de alto, 280px de contenido), así que NO hay overflow y
+    ese scroll nunca llega al DOM: el `scrollTop` real queda en 0 mientras
+    react-window sigue creyendo que va por 120px, y dibuja desde el índice 1.
+    Resultado: MacroV1 no se renderiza y parece que el banco no existe.
+
+    Por eso no alcanzaba con CSS ni con poner `scrollTop = 0`: no había nada
+    que scrollear, el estado desincronizado estaba en React. La solución es
+    despachar un evento `scroll` sintético: React lee el `scrollTop` real (0),
+    corrige su estado y redibuja desde el primer ítem.
+
+    Se identifica el desplegable por `data-baseweb="popover"` (atributo de la
+    librería de componentes, más estable que los `data-testid` de Streamlit).
+    Si una versión futura cambia esto, el desplegable vuelve a comportarse como
+    antes: no rompe nada.
+    """
+    components.html(
+        """
+        <script>
+        (function () {
+            const doc = window.parent.document;
+
+            function redibujarDesdeElPrimero() {
+                doc.querySelectorAll('div[data-baseweb="popover"]').forEach(function (pop) {
+                    // Una sola vez por desplegable: despachar el evento provoca
+                    // un re-render, que a su vez dispara el observer.
+                    if (pop.dataset.scrollCorregido === "1") { return; }
+                    pop.dataset.scrollCorregido = "1";
+                    pop.querySelectorAll("div").forEach(function (caja) {
+                        caja.scrollTop = 0;
+                        caja.dispatchEvent(new Event("scroll", { bubbles: false }));
+                    });
+                });
+            }
+
+            new MutationObserver(redibujarDesdeElPrimero)
+                .observe(doc.body, { childList: true, subtree: true });
+        })();
+        </script>
+        """,
+        height=0,
+    )
 
 
 def sufijo_cuenta(cuenta: str) -> str:
@@ -132,8 +183,17 @@ def main():
             border-radius: 4px;
             margin: 8px 0;
         }
+        /* El componente que fija el scroll del desplegable no debe ocupar
+           lugar: es sólo un <script>. */
+        div[data-testid="stCustomComponentV1"] {
+            height: 0 !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+        }
     </style>
     """, unsafe_allow_html=True)
+
+    _fijar_scroll_desplegable()
 
     col1, col2 = st.columns([1, 3])
     with col1:
