@@ -8,10 +8,20 @@ necesitan una **URL** y la **contraseña** — no instalan nada.
 > servidor), y Vercel está pensado para otro tipo de webs. Streamlit Community
 > Cloud está hecho exactamente para esto y es gratuito.
 
-> **Nota técnica (ya resuelta):** la app usa `pdftotext` de **Xpdf** (el modo
-> `-table` no existe en Poppler). Por eso el binario de Xpdf para Linux viene
-> incluido en `bin/pdftotext` y la app lo usa automáticamente en el servidor.
-> En tu Windows sigue usando el `pdftotext` de tu PATH, como siempre.
+> **Nota técnica (ya resuelta):** la app necesita **dos** `pdftotext` distintos
+> y no son intercambiables:
+>
+> - **Xpdf** para el modo `-table` (Galicia, Santander, Bancor, BBVA, Nación y
+>   MacroV2). Poppler no tiene esa opción, por eso el binario de Xpdf para Linux
+>   viene incluido en `bin/pdftotext`.
+> - **Poppler** para el modo `-layout` (MacroV1). El `-layout` de Xpdf pierde la
+>   columna de importes en buena parte de las filas de Macro, así que Macro no
+>   reconciliaba. Poppler se instala en el servidor vía `packages.txt`
+>   (`poppler-utils`).
+>
+> En Windows, Poppler sale del PATH y para Xpdf la app busca `bin/pdftotext.exe`
+> y las rutas habituales de instalación; si no encuentra ninguno, avisa en
+> pantalla con las instrucciones.
 
 ---
 

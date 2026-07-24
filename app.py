@@ -27,7 +27,7 @@ import streamlit as st
 import os
 import tempfile
 
-from utils import poppler_disponible
+from utils import motores_faltantes
 from parsers import PARSERS
 from excel import generar_excel
 from auth import requiere_login
@@ -41,7 +41,15 @@ from auth import requiere_login
 #  Un banco puede tener más de un formato → futuras versiones (ej. MacroV2).
 # ─────────────────────────────────────────────────────────────────────────────
 
-CAPTURAS_DIR = os.path.join("public", "Captura bancos")
+_RAIZ = os.path.dirname(os.path.abspath(__file__))
+CAPTURAS_DIR = os.path.join(_RAIZ, "public", "Captura bancos")
+
+# El logo vive en public/, pero puede estar en la raíz en instalaciones viejas.
+LOGO = next(
+    (r for r in (os.path.join(_RAIZ, "public", "sg.jpg"), os.path.join(_RAIZ, "sg.jpg"))
+     if os.path.exists(r)),
+    "",
+)
 
 BANCOS = {
     "macro":     {"display": "MacroV1",  "imagen": "MacroV1.PNG"},
@@ -60,6 +68,19 @@ def display_banco(clave: str) -> str:
     if info:
         return info["display"]
     return "BBVA" if clave.lower() == "bbva" else clave.capitalize()
+
+
+def sufijo_cuenta(cuenta: str) -> str:
+    """Sufijo corto para el nombre de hoja cuando el extracto trae varias cuentas.
+
+    BBVA:    "267-015530/5"       → "15530-5"
+    MacroV1: "4-399-0950295930-2" → "0950295930-2"
+    """
+    if "/" in cuenta:
+        ultimo = cuenta.split("-")[-1]
+        return f"{int(ultimo.split('/')[0])}-{ultimo.split('/')[-1]}"
+    partes = cuenta.split("-")
+    return "-".join(partes[2:]) if len(partes) > 3 else cuenta
 
 
 def captura_banco(clave: str):
@@ -116,22 +137,32 @@ def main():
 
     col1, col2 = st.columns([1, 3])
     with col1:
-        st.image("sg.jpg", width=150)
+        if os.path.exists(LOGO):
+            st.image(LOGO, width=150)
     with col2:
         st.title("Conversor de Extractos Bancarios")
         st.caption("Convertí extractos bancarios en PDF a Excel — Macro, Galicia, Santander, Bancor, BBVA, Nación")
 
-    # ── Verificar Poppler ──
-    if not poppler_disponible():
-        st.error(
-            "⚠️ **Poppler no está instalado o no está en el PATH.**\n\n"
-            "Este programa necesita `pdftotext` (parte de Poppler) para leer PDFs.\n\n"
-            "**Instalación en Windows:**\n"
-            "1. Descargar desde: [poppler-windows](https://github.com/oschwartz10612/poppler-windows/releases)\n"
-            "2. Descomprimir en `C:\\poppler`\n"
-            "3. Agregar `C:\\poppler\\Library\\bin` al PATH del sistema\n"
-            "4. Reiniciar esta terminal y volver a ejecutar"
-        )
+    # ── Verificar los dos motores de pdftotext ──
+    faltan = motores_faltantes()
+    if faltan:
+        mensaje = ["⚠️ **Falta al menos un motor de `pdftotext`.**\n"]
+        if "poppler" in faltan:
+            mensaje.append(
+                "**Poppler** (lo usa MacroV1):\n"
+                "1. Descargar desde: [poppler-windows](https://github.com/oschwartz10612/poppler-windows/releases)\n"
+                "2. Descomprimir en `C:\\poppler`\n"
+                "3. Agregar `C:\\poppler\\Library\\bin` al PATH del sistema\n"
+                "4. Reiniciar esta terminal y volver a ejecutar\n"
+            )
+        if "xpdf" in faltan:
+            mensaje.append(
+                "**Xpdf** (lo usan Galicia, Santander, Bancor, BBVA, Nación y MacroV2, "
+                "porque son los únicos que necesitan la opción `-table`, que Poppler no tiene):\n"
+                "1. Descargar desde: [xpdfreader.com](https://www.xpdfreader.com/download.html)\n"
+                "2. Copiar `pdftotext.exe` dentro de la carpeta `bin/` de esta aplicación\n"
+            )
+        st.error("\n".join(mensaje))
         st.stop()
 
     # ── Estado de sesión para acumular hojas ──
@@ -291,22 +322,17 @@ def main():
 
                 base_name = nombre_hoja.strip()
 
-                # Para BBVA: si hay más de una cuenta en el lote, crear una hoja por cuenta
-                if banco == "bbva":
-                    from collections import defaultdict
-                    movs_por_cuenta = defaultdict(list)
-                    for mov in todos_movs:
-                        movs_por_cuenta[mov.get("cuenta", "")].append(mov)
-                else:
-                    movs_por_cuenta = {"": todos_movs}
+                # Si el extracto trae varias cuentas (BBVA y MacroV1 las traen),
+                # va una hoja por cuenta: mezclarlas rompería el saldo arrastrado.
+                from collections import defaultdict
+                movs_por_cuenta = defaultdict(list)
+                for mov in todos_movs:
+                    movs_por_cuenta[mov.get("cuenta") or ""].append(mov)
 
-                if banco == "bbva" and len(movs_por_cuenta) > 1:
+                if len(movs_por_cuenta) > 1:
                     hojas_agregadas = []
                     for cuenta, movs in movs_por_cuenta.items():
-                        # "267-015530/5" → "15530/5"
-                        partes_cta = cuenta.split("-")
-                        sufijo = f"{int(partes_cta[-1].split('/')[0])}-{partes_cta[-1].split('/')[-1]}" if "/" in cuenta else cuenta
-                        sheet_name = f"{base_name} - {sufijo}"[:31]
+                        sheet_name = f"{base_name} - {sufijo_cuenta(cuenta)}"[:31]
                         st.session_state.hojas[sheet_name] = movs
                         hojas_agregadas.append((sheet_name, len(movs)))
                     resumen = " · ".join(f"<strong>{n}</strong> ({c:,})" for n, c in hojas_agregadas)
@@ -356,12 +382,27 @@ def main():
         # ── Botón de descarga ──
         st.divider()
 
-        nombre_archivo = st.text_input(
-            "Nombre del archivo Excel",
-            value="extractos_bancarios.xlsx",
-            key="nombre_archivo",
-        )
-        nombre_archivo = nombre_archivo.strip() or "extractos_bancarios.xlsx"
+        # El nombre va dentro de un form a propósito. El link de descarga se
+        # arma cuando se dibuja el botón, así que si el nombre se tomara del
+        # text_input suelto, al escribirlo y clickear "Descargar" de una el
+        # archivo bajaba con el nombre ANTERIOR (el click viaja con el link ya
+        # dibujado, antes de que Streamlit reciba el texto nuevo). Con el form,
+        # el nombre se confirma con Enter o con "Aplicar", y recién ahí se
+        # redibuja el botón de descarga — que además muestra el nombre final.
+        with st.form("form_nombre_archivo", border=False):
+            col_txt, col_ok = st.columns([4, 1])
+            with col_txt:
+                st.text_input(
+                    "Nombre del archivo Excel",
+                    value="extractos_bancarios.xlsx",
+                    key="nombre_archivo",
+                )
+            with col_ok:
+                st.write("")  # Espaciado para alinear con el input
+                st.form_submit_button("Aplicar", use_container_width=True)
+
+        nombre_archivo = st.session_state.get("nombre_archivo", "").strip()
+        nombre_archivo = nombre_archivo or "extractos_bancarios.xlsx"
         if not nombre_archivo.lower().endswith(".xlsx"):
             nombre_archivo += ".xlsx"
 
@@ -369,7 +410,7 @@ def main():
         with col_dl:
             excel_bytes = generar_excel(st.session_state.hojas)
             st.download_button(
-                label=f"⬇️ Descargar Excel ({len(st.session_state.hojas)} hojas)",
+                label=f"⬇️ Descargar «{nombre_archivo}» ({len(st.session_state.hojas)} hojas)",
                 data=excel_bytes,
                 file_name=nombre_archivo,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

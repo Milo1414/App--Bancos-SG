@@ -46,6 +46,15 @@ def parser_nacion(pdf_path: str) -> tuple:
     movimientos = []
     diagnostico = Diagnostico(total_lineas=len(lines))
 
+    # El umbral de columnas que informa el encabezado no siempre alcanza: Nación
+    # imprime los créditos empezando unos caracteres a la IZQUIERDA de donde
+    # arranca el título "CREDITOS", así que los créditos grandes caen del lado
+    # del débito y se clasifican mal. El criterio confiable es el propio saldo:
+    # es un saldo acumulado, así que el signo de (saldo − saldo_anterior) dice
+    # si el movimiento sumó o restó. La posición queda sólo como respaldo para
+    # cuando no hay saldo previo o el delta no coincide con el importe.
+    saldo_previo = extraer_saldo_inicial(lines)
+
     for line_idx, line in enumerate(lines):
         m = re_fecha_line.match(line)
         if not m:
@@ -78,14 +87,29 @@ def parser_nacion(pdf_path: str) -> tuple:
         saldo = parse_num(matches[-1][1])
         debito = credito = None
         if len(matches) >= 2:
-            umbral = get_umbral(line_idx)
             pos2 = matches[-2][0]
             val2 = parse_num(matches[-2][1])
             if val2 is not None:
-                if pos2 < umbral:
-                    debito = abs(val2)
+                importe = abs(val2)
+                es_credito = None
+
+                # 1º criterio: variación del saldo acumulado.
+                if saldo_previo is not None and saldo is not None:
+                    delta = round(saldo - saldo_previo, 2)
+                    if abs(abs(delta) - importe) <= 0.01:
+                        es_credito = delta > 0
+
+                # 2º criterio (respaldo): posición respecto de las columnas.
+                if es_credito is None:
+                    es_credito = pos2 >= get_umbral(line_idx)
+
+                if es_credito:
+                    credito = importe
                 else:
-                    credito = abs(val2)
+                    debito = importe
+
+        if saldo is not None:
+            saldo_previo = saldo
 
         movimientos.append({
             "mes": mes, "fecha": fecha, "descripcion": descripcion,
