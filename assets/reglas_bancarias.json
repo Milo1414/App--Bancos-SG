@@ -1029,6 +1029,90 @@
       "description_patterns": [],
       "predicate": "residual_credit",
       "note": "Regla de negocio de Milo: créditos restantes luego de inversiones, efectivo, transferencias propias, devoluciones y exclusiones. No es una afirmación contable universal."
+    },
+    {
+      "id": "SAN_OWN_EXPLICIT",
+      "bank": "Santander",
+      "priority": 46,
+      "detalle": "Transferencia entre cuentas",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "decision_usuario",
+      "description_patterns": [
+        "^PAGOS? CTAS? PROPIAS INTERBANKING\\b"
+      ],
+      "predicate": null,
+      "note": "El texto operativo del banco identifica una transferencia entre cuentas propias: no exige nombre ni CUIT del cliente. Se resuelve antes de proveedores y del crédito residual."
+    },
+    {
+      "id": "SAN_ARCA_DIRECT",
+      "bank": "Santander",
+      "priority": 40,
+      "detalle": "Pago Arca",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "decision_usuario",
+      "description_patterns": [
+        "^PAGO AFIP SERVICIO INTERBANKING\\b"
+      ],
+      "predicate": null,
+      "note": "Pago AFIP directo: la primera línea identifica el pago fiscal. Distinta de SAN_ARCA, que sigue exigiendo IMP.AFIP/IMP.ARCA en la segunda línea de un PAGO DE SERVICIOS."
+    },
+    {
+      "id": "SAN_PAYROLL",
+      "bank": "Santander",
+      "priority": 50,
+      "detalle": "Sueldos a Pagar",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "decision_usuario",
+      "description_patterns": [
+        "^PAGO HABERES\\b"
+      ],
+      "predicate": null,
+      "note": "Débito de pago de haberes. No cubre 'PAGO DE HABERES POR CCI' (variante no autorizada, queda #N/D). Una COMISION ... HABERES sigue la regla de comisiones (prioridad 30)."
+    },
+    {
+      "id": "SAN_PAYROLL_ARCA_CREDIT_REVIEW",
+      "bank": "Santander",
+      "priority": 72,
+      "detalle": "#N/D",
+      "directions": [
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "control_preventivo_sin_muestras_nuevas",
+      "description_patterns": [
+        "^PAGO HABERES\\b",
+        "^PAGO AFIP SERVICIO INTERBANKING\\b"
+      ],
+      "predicate": null,
+      "note": "Un crédito con texto de pago de haberes o de pago AFIP directo no tiene regla validada: queda pendiente en vez de caer en el crédito residual."
+    },
+    {
+      "id": "SAN_PAYROLL_ARCA_REVERSAL_REVIEW",
+      "bank": "Santander",
+      "priority": 72,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "control_preventivo",
+      "description_patterns": [
+        "^(?:ANUL(?:ACION)?|DEV(?:OLUCION)?|REVERSO|REINTEGRO) (?:DE )?PAGO (?:DE )?HABERES\\b",
+        "^(?:ANUL(?:ACION)?|DEV(?:OLUCION)?|REVERSO|REINTEGRO) (?:DE )?PAGO AFIP\\b"
+      ],
+      "predicate": null,
+      "note": "Reverso de un pago de haberes o AFIP sin regla de devolución validada: pendiente. 'ANUL' no lo cubre el bloqueo genérico de reversos (ANULACION)."
     }
   ],
   "evidence_note": "Los ejemplos y conteos de evidencia citan clientes reales y se conservan solo en la copia local (public/conciliaciones_bancarias/). Esta copia tiene las mismas reglas."

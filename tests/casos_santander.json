@@ -1,0 +1,480 @@
+[
+  {
+    "id": "SAN_PROPIAS_credito_perfil_vacio",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pagos ctas propias interbanking in",
+      "descripcion_secundaria": "Empresa nueva s r l 30123456789 01 1808386",
+      "debito": null,
+      "credito": "5300000"
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Transferencia entre cuentas",
+    "regla_esperada": "SAN_OWN_EXPLICIT"
+  },
+  {
+    "id": "SAN_PROPIAS_debito_perfil_vacio",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pagos ctas propias interbanking in",
+      "descripcion_secundaria": null,
+      "debito": "1000",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Transferencia entre cuentas",
+    "regla_esperada": "SAN_OWN_EXPLICIT"
+  },
+  {
+    "id": "SAN_PROPIAS_empresa_nueva",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pagos ctas propias interbanking in",
+      "descripcion_secundaria": "Empresa nueva sa 30123456789 01 999",
+      "debito": null,
+      "credito": "100"
+    },
+    "config_cliente": {
+      "razon_social": "EMPRESA NUEVA SA",
+      "cuits_propios": [
+        "30123456789"
+      ]
+    },
+    "detalle_esperado": "Transferencia entre cuentas",
+    "regla_esperada": "SAN_OWN_EXPLICIT"
+  },
+  {
+    "id": "SAN_PROPIAS_sin_credito_residual",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pagos ctas propias interbanking in",
+      "descripcion_secundaria": null,
+      "debito": null,
+      "credito": "100"
+    },
+    "config_cliente": {
+      "reglas_negocio": {
+        "creditos_residuales_ventas": false
+      }
+    },
+    "detalle_esperado": "Transferencia entre cuentas",
+    "regla_esperada": "SAN_OWN_EXPLICIT"
+  },
+  {
+    "id": "SAN_PROPIAS_variante_puntuacion",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "PAGOS CTAS. PROPIAS INTERBANKING",
+      "descripcion_secundaria": null,
+      "debito": null,
+      "credito": "100"
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Transferencia entre cuentas",
+    "regla_esperada": "SAN_OWN_EXPLICIT"
+  },
+  {
+    "id": "SAN_PROPIAS_variante_espacios_datos",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "pagos  ctas  propias   interbanking IN 01 1812400",
+      "descripcion_secundaria": null,
+      "debito": null,
+      "credito": "100"
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Transferencia entre cuentas",
+    "regla_esperada": "SAN_OWN_EXPLICIT"
+  },
+  {
+    "id": "SAN_PROPIAS_exclusion_no_aplica",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pagos ctas propias interbanking in",
+      "descripcion_secundaria": "Socio ejemplo 20111111112 01 1",
+      "debito": "100",
+      "credito": null
+    },
+    "config_cliente": {
+      "contrapartes_excluidas": [
+        {
+          "alias": [
+            "SOCIO EJEMPLO"
+          ],
+          "directions": [
+            "Debito"
+          ],
+          "motivo": "cuenta particular de socio"
+        }
+      ]
+    },
+    "detalle_esperado": "Transferencia entre cuentas",
+    "regla_esperada": "SAN_OWN_EXPLICIT"
+  },
+  {
+    "id": "SAN_HABERES_debito",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pago haberes",
+      "descripcion_secundaria": "2602065072",
+      "debito": "875647.60",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Sueldos a Pagar",
+    "regla_esperada": "SAN_PAYROLL"
+  },
+  {
+    "id": "SAN_HABERES_debito_datos_variables",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "PAGO HABERES 2602065072",
+      "descripcion_secundaria": null,
+      "debito": "1.00",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Sueldos a Pagar",
+    "regla_esperada": "SAN_PAYROLL"
+  },
+  {
+    "id": "SAN_HABERES_debito_empresa_nueva",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pago haberes",
+      "descripcion_secundaria": null,
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {
+      "razon_social": "EMPRESA NUEVA SA",
+      "cuits_propios": [
+        "30123456789"
+      ]
+    },
+    "detalle_esperado": "Sueldos a Pagar",
+    "regla_esperada": "SAN_PAYROLL"
+  },
+  {
+    "id": "SAN_HABERES_credito_pendiente",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pago haberes",
+      "descripcion_secundaria": null,
+      "debito": null,
+      "credito": "10"
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": "SAN_PAYROLL_ARCA_CREDIT_REVIEW"
+  },
+  {
+    "id": "SAN_HABERES_credito_sin_residual",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pago haberes",
+      "descripcion_secundaria": null,
+      "debito": null,
+      "credito": "10"
+    },
+    "config_cliente": {
+      "reglas_negocio": {
+        "creditos_residuales_ventas": false
+      }
+    },
+    "detalle_esperado": "#N/D",
+    "regla_esperada": "SAN_PAYROLL_ARCA_CREDIT_REVIEW"
+  },
+  {
+    "id": "SAN_HABERES_cci_no_autorizada",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pago de haberes por cci",
+      "descripcion_secundaria": "&&000000000000001",
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": null
+  },
+  {
+    "id": "SAN_HABERES_anulacion",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Anul pago haberes por cci",
+      "descripcion_secundaria": "A cbu 0000000000000000000000",
+      "debito": null,
+      "credito": "10"
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": "SAN_PAYROLL_ARCA_REVERSAL_REVIEW"
+  },
+  {
+    "id": "SAN_HABERES_devolucion",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Devolucion pago haberes",
+      "descripcion_secundaria": null,
+      "debito": null,
+      "credito": "10"
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": "SAN_PAYROLL_ARCA_REVERSAL_REVIEW"
+  },
+  {
+    "id": "SAN_HABERES_comision",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Comision pago haberes",
+      "descripcion_secundaria": null,
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Gastos y comisiones Bancarias",
+    "regla_esperada": "SAN_FEES"
+  },
+  {
+    "id": "SAN_AFIP_directo_debito",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pago afip servicio interbanking",
+      "descripcion_secundaria": "Recaudaciones afip tef electr 30500008454 14 5135129",
+      "debito": "1000",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Pago Arca",
+    "regla_esperada": "SAN_ARCA_DIRECT"
+  },
+  {
+    "id": "SAN_AFIP_directo_datos_variables",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "PAGO AFIP SERVICIO INTERBANKING 14 5135131",
+      "descripcion_secundaria": null,
+      "debito": "1",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Pago Arca",
+    "regla_esperada": "SAN_ARCA_DIRECT"
+  },
+  {
+    "id": "SAN_AFIP_directo_credito_pendiente",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pago afip servicio interbanking",
+      "descripcion_secundaria": null,
+      "debito": null,
+      "credito": "1000"
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": "SAN_PAYROLL_ARCA_CREDIT_REVIEW"
+  },
+  {
+    "id": "SAN_AFIP_directo_anulacion",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Anulacion pago afip servicio interbanking",
+      "descripcion_secundaria": null,
+      "debito": null,
+      "credito": "1000"
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": "SAN_PAYROLL_ARCA_REVERSAL_REVIEW"
+  },
+  {
+    "id": "SAN_AFIP_comision",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Com pago afip servicio interbanking",
+      "descripcion_secundaria": null,
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Gastos y comisiones Bancarias",
+    "regla_esperada": "SAN_FEES"
+  },
+  {
+    "id": "SAN_SERVICIOS_con_afip",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pago de servicios",
+      "descripcion_secundaria": "IMP.AFIP: 99999999999",
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Pago Arca",
+    "regla_esperada": "SAN_ARCA"
+  },
+  {
+    "id": "SAN_SERVICIOS_sin_beneficiario",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pago de servicios",
+      "descripcion_secundaria": null,
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": null
+  },
+  {
+    "id": "SAN_SERVICIOS_epec",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pago de servicios",
+      "descripcion_secundaria": "EPEC: 0001234",
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": null
+  },
+  {
+    "id": "SAN_TEXTO_en_segunda_linea",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Transferencia realizada",
+      "descripcion_secundaria": "A proveedor ejemplo / pago haberes - var / 30111111118",
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Proveedores",
+    "regla_esperada": "SAN_PAYMENTS"
+  },
+  {
+    "id": "SAN_TEXTO_en_pie",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Impuesto ley 25.413 debito 0,6% Pago afip servicio interbanking",
+      "descripcion_secundaria": null,
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "imp 25.413",
+    "regla_esperada": "SAN_TAX_25413"
+  },
+  {
+    "id": "SAN_TEXTO_no_al_inicio",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Debito automatico pago haberes",
+      "descripcion_secundaria": null,
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": null
+  },
+  {
+    "id": "SAN_INVALIDO_db_y_cr",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pago haberes",
+      "descripcion_secundaria": null,
+      "debito": "10",
+      "credito": "10"
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": null
+  },
+  {
+    "id": "SAN_INVALIDO_cero",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Santander",
+      "descripcion": "Pagos ctas propias interbanking in",
+      "descripcion_secundaria": null,
+      "debito": "0",
+      "credito": "0"
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": null
+  },
+  {
+    "id": "SAN_OTRO_BANCO_haberes",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Galicia",
+      "descripcion": "PAGO HABERES",
+      "descripcion_secundaria": null,
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": null
+  },
+  {
+    "id": "SAN_OTRO_BANCO_afip",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Nacion",
+      "descripcion": "PAGO AFIP SERVICIO INTERBANKING",
+      "descripcion_secundaria": null,
+      "debito": "10",
+      "credito": null
+    },
+    "config_cliente": {},
+    "detalle_esperado": "#N/D",
+    "regla_esperada": null
+  },
+  {
+    "id": "SAN_OTRO_BANCO_propias",
+    "tipo": "sintetico",
+    "movimiento": {
+      "banco": "Galicia",
+      "descripcion": "PAGOS CTAS PROPIAS INTERBANKING",
+      "descripcion_secundaria": null,
+      "debito": null,
+      "credito": "10"
+    },
+    "config_cliente": {},
+    "detalle_esperado": "Deudores por venta",
+    "regla_esperada": "COMMON_RESIDUAL_CREDIT"
+  }
+]

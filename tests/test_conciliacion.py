@@ -634,12 +634,137 @@ class FlujoPDF(unittest.TestCase):
         self.assertTrue(all(d["detalle"] == "#N/D" and "Macro" in d["motivo"] for d in rep))
 
     def test_santander_real_con_perfil(self):
+        """Con perfil: «mismo titular» se resuelve por CUIT (COMMON_OWN_ID); «ctas propias», por texto."""
         self.assertEqual(len(self.perfil_titular["cuits_propios"]), 1)
         rep = [d for d in self.reporte if d["hoja"] == self.hoja_santander]
         propias = [d for d in rep if d["detalle"] == "Transferencia entre cuentas"]
-        self.assertTrue(propias)
-        self.assertTrue(all(d["regla_id"] == "COMMON_OWN_ID" for d in propias))
-        self.assertTrue(all(d["descripcion"].startswith("Transf recibida cvu mismo titular") for d in propias))
+        por_cuit = [d for d in propias if d["regla_id"] == "COMMON_OWN_ID"]
+        self.assertTrue(por_cuit)
+        self.assertTrue(all(d["descripcion"].startswith("Transf recibida cvu mismo titular") for d in por_cuit))
+        self.assertTrue(all(d["regla_id"] in ("COMMON_OWN_ID", "SAN_OWN_EXPLICIT") for d in propias))
+
+    def test_santander_familias_reales_hasta_el_xlsx(self):
+        """Las tres familias autorizadas en los dos PDF Santander, sin perfil (como la app)."""
+        # (familia, dirección) → (detalle esperado, regla) según la decisión de negocio
+        esperado = {
+            ("propias", "Credito"): ("Transferencia entre cuentas", "SAN_OWN_EXPLICIT"),
+            ("haberes", "Debito"): ("Sueldos a Pagar", "SAN_PAYROLL"),
+            ("afip", "Debito"): ("Pago Arca", "SAN_ARCA_DIRECT"),
+            ("anul_haberes", "Credito"): ("#N/D", "SAN_PAYROLL_ARCA_REVERSAL_REVIEW"),
+            ("haberes_cci", "Debito"): ("#N/D", None),  # variante no autorizada
+        }
+        familias = (("propias", r"^PAGOS? CTAS? PROPIAS INTERBANKING\b"), ("haberes", r"^PAGO HABERES\b"),
+                    ("afip", r"^PAGO AFIP SERVICIO INTERBANKING\b"),
+                    ("anul_haberes", r"^ANUL PAGO HABERES\b"), ("haberes_cci", r"^PAGO DE HABERES\b"))
+        conteos_esperados = {
+            "23d7606f3d03935f": {("propias", "Credito"): 4, ("haberes", "Debito"): 12},
+            "0190cb4e17db0320": {("propias", "Credito"): 19, ("haberes", "Debito"): 30, ("afip", "Debito"): 5,
+                                 ("anul_haberes", "Credito"): 2, ("haberes_cci", "Debito"): 7},
+        }
+        for h, esperados in conteos_esperados.items():
+            hoja = f"H{list(PDFS).index(h)} santander"
+            filas, rep = C.clasificar_hojas({hoja: self.hojas[hoja]}, None, CATALOGO)
+            ws = openpyxl.load_workbook(io.BytesIO(generar_excel(filas)))[hoja]
+            self.assertEqual(ws["J1"].value, "Detalle")
+            conteos = {}
+            for i, (mov, dec) in enumerate(zip(self.hojas[hoja], rep)):
+                op = C.normalizar(mov["descripcion_operativa"])
+                direccion = "Credito" if mov["credito"] else "Debito"
+                for familia, patron in familias:
+                    if re.search(patron, op):
+                        clave = (familia, direccion)
+                        conteos[clave] = conteos.get(clave, 0) + 1
+                        with self.subTest(pdf=h, fila=i + 3, familia=familia):
+                            self.assertEqual((dec["detalle"], dec["regla_id"]), esperado[clave])
+                            celda = ws.cell(i + 3, 10)
+                            self.assertEqual(celda.value, esperado[clave][0])
+                            self.assertEqual(celda.data_type, "s")
+            self.assertEqual(conteos, esperados, h)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+CASOS_SANTANDER = json.loads(Path(__file__).with_name("casos_santander.json").read_text(encoding="utf-8"))
+
+
+class CorreccionSantander(unittest.TestCase):
+    """Tres familias autorizadas: propias, haberes y pago AFIP directo."""
+
+    def test_casos_sinteticos(self):
+        self.assertEqual(len(CASOS_SANTANDER), 32)
+        for c in CASOS_SANTANDER:
+            with self.subTest(c["id"]):
+                d = C.categorizar_movimiento(c["movimiento"], c["config_cliente"], CATALOGO)
+                self.assertEqual((d["detalle"], d["regla_id"]), (c["detalle_esperado"], c["regla_esperada"]))
+                self.assertTrue(d["motivo"])
+
+    @sin_paquete
+    def test_misma_decision_que_la_referencia(self):
+        sys.path.insert(0, str(PAQUETE))
+        import motor_referencia as R
+        ref = R.cargar_catalogo(PAQUETE / "reglas_bancarias.json")
+        for c in CASOS_SANTANDER:
+            a = C.categorizar_movimiento(c["movimiento"], c["config_cliente"], CATALOGO)
+            b = R.categorizar_movimiento(c["movimiento"], c["config_cliente"], ref)
+            self.assertEqual((a["detalle"], a["regla_id"], a["motivo"]),
+                             (b["detalle"], b["regla_id"], b["motivo"]), c["id"])
+
+    def test_reglas_en_el_catalogo(self):
+        reglas = {r["id"]: r for r in JSON_CATALOGO["rules"]}
+        esperadas = {
+            "SAN_OWN_EXPLICIT": ("Transferencia entre cuentas", ["Debito", "Credito"]),
+            "SAN_PAYROLL": ("Sueldos a Pagar", ["Debito"]),
+            "SAN_ARCA_DIRECT": ("Pago Arca", ["Debito"]),
+            "SAN_PAYROLL_ARCA_CREDIT_REVIEW": ("#N/D", ["Credito"]),
+            "SAN_PAYROLL_ARCA_REVERSAL_REVIEW": ("#N/D", ["Debito", "Credito"]),
+        }
+        for rid, (det, dirs) in esperadas.items():
+            r = reglas[rid]
+            self.assertEqual((r["bank"], r["detalle"], r["directions"], r["enabled"]), ("Santander", det, dirs, True))
+            self.assertTrue(r["note"] and r["status"])
+        p = {rid: r["priority"] for rid, r in reglas.items()}
+        # Antes de proveedores y del crédito residual; después de impuestos y comisiones
+        for rid in esperadas:
+            self.assertLess(p[rid], p["SAN_PAYMENTS"])
+            self.assertLess(p[rid], p["COMMON_RESIDUAL_CREDIT"])
+            self.assertGreater(p[rid], p["SAN_FEES"])
+        self.assertEqual(p["SAN_ARCA_DIRECT"], p["SAN_ARCA"])
+        # SAN_ARCA conserva la condición de segunda línea
+        self.assertEqual(reglas["SAN_ARCA"]["secondary_patterns"], [r"^IMP (?:AFIP|ARCA)\b"])
+
+    def test_importe_no_cambia_la_categoria(self):
+        for importe in ("0.01", "1", "123456789.99"):
+            self.assertEqual(detalle(mov("Santander", "Pago haberes", debito=importe)), "Sueldos a Pagar")
+            self.assertEqual(detalle(mov("Santander", "Pagos ctas propias interbanking in", credito=importe)),
+                             "Transferencia entre cuentas")
+
+    def test_entradas_invalidas(self):
+        for m in (mov("Santander", "Pago haberes", debito=float("nan")),
+                  mov("Santander", "Pago haberes", debito=-10),
+                  mov("Santander", "Pago afip servicio interbanking", debito=10, tipo_movimiento="Credito"),
+                  mov(None, "Pago haberes", debito=10)):
+            d = C.categorizar_movimiento(m, None, CATALOGO)
+            self.assertEqual((d["detalle"], d["regla_id"]), ("#N/D", None))
+            self.assertTrue(d["motivo"])
+
+    def test_conflicto_de_igual_prioridad_sigue_en_nd(self):
+        datos = copy.deepcopy(JSON_CATALOGO)
+        datos["rules"].append({
+            "id": "TEST_CONFLICTO_HABERES", "bank": "Santander", "priority": 50, "detalle": "Proveedores",
+            "directions": ["Debito"], "enabled": True, "status": "test",
+            "description_patterns": [r"^PAGO HABERES\b"], "predicate": None, "note": ""})
+        d = C.categorizar_movimiento(mov("Santander", "Pago haberes", debito=1), None, C.compilar_catalogo(datos))
+        self.assertEqual((d["detalle"], d["motivo"]), ("#N/D", "Conflicto de reglas de igual prioridad"))
+        self.assertEqual(sorted(d["reglas_en_conflicto"]), ["SAN_PAYROLL", "TEST_CONFLICTO_HABERES"])
+
+    def test_exclusiones_siguen_funcionando_en_transferencias(self):
+        perfil = {"contrapartes_excluidas": [{"alias": ["SOCIO EJEMPLO"], "directions": ["Debito"],
+                                              "motivo": "socio"}]}
+        realizada = mov("Santander", "Transferencia realizada", debito=10,
+                        descripcion_secundaria="A socio ejemplo / varios - var / 20111111112")
+        self.assertEqual(detalle(realizada, perfil), "#N/D")
+        recibida = mov("Santander", "Transferencia recibida", credito=10,
+                       descripcion_secundaria="De socio ejemplo / varios - var / 20111111112")
+        self.assertEqual(detalle(recibida, perfil), "Deudores por venta")
 
 
 if __name__ == "__main__":
