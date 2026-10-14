@@ -5,8 +5,22 @@
 import io
 import re
 import openpyxl
+from conciliacion import CATEGORIAS, PENDIENTE
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+
+_DETALLES_VALIDOS = frozenset(CATEGORIAS) | {PENDIENTE}
+
+
+def _detalle(tx) -> str:
+    """Detalle de la fila: una categoría permitida o "#N/D" (si no se clasificó)."""
+    detalle = tx.get("detalle")
+    if detalle is None:
+        return PENDIENTE
+    if detalle not in _DETALLES_VALIDOS:
+        raise ValueError(f"Detalle fuera del catálogo: {detalle!r}")
+    return detalle
 
 
 def generar_excel(hojas: dict) -> bytes:
@@ -23,6 +37,10 @@ def generar_excel(hojas: dict) -> bytes:
                 aplicando créditos y débitos (fórmula de Excel, se recalcula sola)
               - "Diferencia": saldo calculado − saldo informado (0 si todo cuadra)
       La columna "Cuenta" solo se agrega si la hoja tiene ese dato (BBVA).
+      La columna "Detalle" va siempre al final: J si la hoja no tiene Cuenta,
+      K si la tiene. Así A..I (y J Cuenta) y sus fórmulas no se mueven.
+      Cada movimiento lleva una de las 13 categorías o el texto "#N/D"; la
+      fila SALDO INICIAL no lleva Detalle (no es un movimiento).
     """
     wb = openpyxl.Workbook()
     if wb.sheetnames == ["Sheet"]:
@@ -61,6 +79,7 @@ def generar_excel(hojas: dict) -> bytes:
     # Índices (1-based):
     #   1 Nro de Mes | 2 Fecha | 3 Descripcion | 4 (vacía) | 5 Debito | 6 Credito
     #   7 Saldo | 8 Saldo calculado | 9 Diferencia | (10 Cuenta, opcional)
+    #   | Detalle (10 sin Cuenta, 11 con Cuenta)
     headers_base = ["Nro de Mes", "Fecha", "Descripcion", "",
                     "Debito", "Credito", "Saldo", "Saldo calculado", "Diferencia"]
     widths_base  = [12, 14, 60, 18, 16, 16, 20, 18, 16]
@@ -75,6 +94,9 @@ def generar_excel(hojas: dict) -> bytes:
         if tiene_cuenta:
             headers.append("Cuenta")
             widths.append(18)
+        headers.append("Detalle")
+        widths.append(30)
+        col_detalle = len(headers)  # J o K según la hoja
 
         # ── Encabezados (fila 1) ──
         for col, (hdr, w) in enumerate(zip(headers, widths), 1):
@@ -137,6 +159,7 @@ def generar_excel(hojas: dict) -> bytes:
             ]
             if tiene_cuenta:
                 valores.append(tx.get("cuenta"))
+            valores.append(_detalle(tx))
 
             for col, val in enumerate(valores, 1):
                 cell = ws.cell(row=r, column=col, value=val)
@@ -149,6 +172,11 @@ def generar_excel(hojas: dict) -> bytes:
                     cell.alignment = Alignment(horizontal="left")
                 elif col == 4:
                     pass  # columna vacía
+                elif col == col_detalle:
+                    # Siempre texto: "#N/D" es una cadena, no un error de Excel.
+                    cell.data_type     = "s"
+                    cell.number_format = "@"
+                    cell.alignment     = Alignment(horizontal="left")
                 elif col == COL_CUENTA:
                     cell.alignment = Alignment(horizontal="center")
                 else:

@@ -1,0 +1,1035 @@
+{
+  "schema_version": 1,
+  "title": "Reglas de categorización bancaria determinista",
+  "analysis_date": "2026-10-12",
+  "allowed_details": [
+    "Deudores por venta",
+    "Proveedores",
+    "Retencion IIBB",
+    "imp 25.413",
+    "Gastos y comisiones Bancarias",
+    "Iva Credito",
+    "Iva Percepcion",
+    "Sueldos a Pagar",
+    "Fondo comun de Inversion",
+    "Plazo Fijo",
+    "Pago Arca",
+    "Transferencia entre cuentas",
+    "Caja"
+  ],
+  "fallback": "#N/D",
+  "banks": [
+    "Galicia",
+    "BBVA",
+    "Santander",
+    "Nacion",
+    "Bancor"
+  ],
+  "normalization": {
+    "unicode": "NFKD + retirar marcas diacríticas",
+    "case": "upper",
+    "iva_abbreviation": "I.V.A. e IVA -> IVA",
+    "tax_number": "25.413 y 25 413 -> 25413 (antes de separar puntuación)",
+    "punctuation": "Separadores no alfanuméricos -> espacio; colapsar espacios",
+    "keep_digits": true,
+    "footer_markers": [
+      "LOS DEPOSITOS EN PESOS Y EN MONEDA EXTRANJERA",
+      "LOS TOTALES MENSUALES DE RETENCION IMPUESTO",
+      "CANAL DE ATENCION",
+      "CANALES DE ATENCION",
+      "USTED PUEDE CONSULTAR EL",
+      "CUIT DEL RESPONSABLE IMPOSITIVO",
+      "CUIT RESPONSABLE IMPOSITIVO"
+    ],
+    "owner_footer": "Cuando CUIT DEL RESPONSABLE IMPOSITIVO sigue a un alias del titular, cortar también el alias que pertenece a ese encabezado/pie.",
+    "source_preservation": "Conservar siempre descripción original; limpiar una copia solo para comparar."
+  },
+  "resolution": {
+    "priority": "menor primero",
+    "same_priority_conflict": "#N/D y registrar conflicto si distintos detalles cumplen la misma prioridad",
+    "unknown_bank": "#N/D",
+    "invalid_direction": "#N/D; no deducir dirección de D/C en el texto",
+    "metadata_only": "Nunca usar Detalle, Cuenta, Descripción manual ni fila como entrada del clasificador.",
+    "dynamic_identity": "CUIT/alias/cuenta del cliente se proporcionan en configuración; nunca están fijados dentro de description_patterns."
+  },
+  "rules": [
+    {
+      "id": "CLIENT_EXCLUDED",
+      "bank": "*",
+      "priority": 5,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [],
+      "predicate": "excluded_counterparty",
+      "note": "La contraparte excluida se configura por cliente. Aplicar a una operación de transferencia/pago, nunca a un pie de página ni a un nombre aislado en cualquier texto."
+    },
+    {
+      "id": "GAL_TAX_25413",
+      "bank": "Galicia",
+      "priority": 10,
+      "detalle": "imp 25.413",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:IMP (?:DEB|CRE) LEY|DEV IMP (?:DEB )?LEY) 25413\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BBVA_TAX_25413",
+      "bank": "BBVA",
+      "priority": 10,
+      "detalle": "imp 25.413",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)(?:IMP(?:UESTO)? LEY|LEY NRO|REINTEGRO (?:IMP(?:UESTO)? )?LEY) 25413\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "SAN_TAX_25413",
+      "bank": "Santander",
+      "priority": 10,
+      "detalle": "imp 25.413",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^IMPUESTO LEY 25413\\b",
+        "^IMP AL DEBITO EXTR EFVO\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "NAC_TAX_25413",
+      "bank": "Nacion",
+      "priority": 10,
+      "detalle": "imp 25.413",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:GRAVAMEN|REINTEGRO) LEY 25413\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BCR_TAX_25413",
+      "bank": "Bancor",
+      "priority": 10,
+      "detalle": "imp 25.413",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^IMP S OPER (?:DEBITOS|CREDITOS)\\b"
+      ],
+      "predicate": null,
+      "note": "El extracto no necesita mencionar 25413: el histórico identifica ambos textos como ese impuesto."
+    },
+    {
+      "id": "BBVA_IIBB",
+      "bank": "BBVA",
+      "priority": 15,
+      "detalle": "Retencion IIBB",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)RET IB CORDOBA COL FIN\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "NAC_IIBB",
+      "bank": "Nacion",
+      "priority": 15,
+      "detalle": "Retencion IIBB",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^REG REC SIRCREB\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BCR_IIBB",
+      "bank": "Bancor",
+      "priority": 15,
+      "detalle": "Retencion IIBB",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^RECAUDACION SIRCREB\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "GAL_IVA_PER",
+      "bank": "Galicia",
+      "priority": 20,
+      "detalle": "Iva Percepcion",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^PERCEP IVA\\b",
+        "^IVA PERCEPCIONES\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BBVA_IVA_PER",
+      "bank": "BBVA",
+      "priority": 20,
+      "detalle": "Iva Percepcion",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)PERCEPCION IVA RG\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "NAC_IVA_PER",
+      "bank": "Nacion",
+      "priority": 20,
+      "detalle": "Iva Percepcion",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^RETEN IVA RG\\s*2408\\b"
+      ],
+      "predicate": null,
+      "note": "Aunque dice RETEN, los 15 casos históricos son Percepción IVA. Regla específica de este banco."
+    },
+    {
+      "id": "BCR_IVA_PER",
+      "bank": "Bancor",
+      "priority": 20,
+      "detalle": "Iva Percepcion",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^IVA PERCEPC RG\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "GAL_IVA_CRED",
+      "bank": "Galicia",
+      "priority": 25,
+      "detalle": "Iva Credito",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^IVA\\b",
+        "^REINTEGRO IVA\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BBVA_IVA_CRED",
+      "bank": "BBVA",
+      "priority": 25,
+      "detalle": "Iva Credito",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)IVA (?:R I|TASA GENERAL)\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "SAN_IVA_CRED",
+      "bank": "Santander",
+      "priority": 25,
+      "detalle": "Iva Credito",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^IVA 21\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "NAC_IVA_CRED",
+      "bank": "Nacion",
+      "priority": 25,
+      "detalle": "Iva Credito",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^IVA (?:BASE|COMISION|RG\\s*3337 COMI)\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BCR_IVA_CRED",
+      "bank": "Bancor",
+      "priority": 25,
+      "detalle": "Iva Credito",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^IVA (?:INTERESES|21 COMISIONES)\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "GAL_FEES",
+      "bank": "Galicia",
+      "priority": 30,
+      "detalle": "Gastos y comisiones Bancarias",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:COM|COMISION)\\b",
+        "^DEVOLUCION COMISIONES\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BBVA_FEES",
+      "bank": "BBVA",
+      "priority": 30,
+      "detalle": "Gastos y comisiones Bancarias",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)(?:COM|COMI|COMISION|MANTENIMIENTO DE CUENTA)\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "SAN_FEES",
+      "bank": "Santander",
+      "priority": 30,
+      "detalle": "Gastos y comisiones Bancarias",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:COM|COMISION)\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "NAC_FEES",
+      "bank": "Nacion",
+      "priority": 30,
+      "detalle": "Gastos y comisiones Bancarias",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:COM|COMI|COMIS)\\b",
+        "^ECHEQ (?:END|EMI|ANU|DEV) NRO\\b"
+      ],
+      "predicate": null,
+      "note": "ECHEQ.END/EMI/ANU/DEV son gastos según este histórico. No confundir emisión o endoso con el pago de un e-cheque."
+    },
+    {
+      "id": "BCR_FEES",
+      "bank": "Bancor",
+      "priority": 30,
+      "detalle": "Gastos y comisiones Bancarias",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:COM|GTO MAN COM VARIAS|LOCACION CAJA SEGURI)\\b"
+      ],
+      "predicate": null,
+      "note": "LOCACION CAJA SEGURI es un gasto por caja de seguridad, no un movimiento de efectivo."
+    },
+    {
+      "id": "GAL_FCI",
+      "bank": "Galicia",
+      "priority": 35,
+      "detalle": "Fondo comun de Inversion",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:SUSCRIPCION|RESCATE) FIMA\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BBVA_FCI",
+      "bank": "BBVA",
+      "priority": 35,
+      "detalle": "Fondo comun de Inversion",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)(?:OPER FONDO COMUN DE INVERSI\\w*|OPERACION FCI)\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "SAN_FCI",
+      "bank": "Santander",
+      "priority": 35,
+      "detalle": "Fondo comun de Inversion",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:SUSCRIPCION|RESCATE) FONDOS COMUNES INVERS\\w*\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "COMMON_PLAZO_FIJO",
+      "bank": "*",
+      "priority": 36,
+      "detalle": "Plazo Fijo",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": false,
+      "status": "propuesta_sin_muestras",
+      "description_patterns": [
+        "^(?:(?:CONSTITUCION|VENCIMIENTO|CANCELACION|RENOVACION|ACREDITACION|RESCATE) (?:DE )?)?PLAZO FIJO\\b"
+      ],
+      "predicate": null,
+      "note": "No se encontraron operaciones de plazo fijo. Expresión propuesta, no patrón observado. Validar con muestras reales antes de activar."
+    },
+    {
+      "id": "GAL_ARCA",
+      "bank": "Galicia",
+      "priority": 40,
+      "detalle": "Pago Arca",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^TRANSF(?:ERENCIA)? VEP\\b"
+      ],
+      "predicate": null,
+      "note": "Clasificar el pago bancario completo. No intentar reconstruir los desgloses contables de SICORE, ART o intereses."
+    },
+    {
+      "id": "BBVA_ARCA",
+      "bank": "BBVA",
+      "priority": 40,
+      "detalle": "Pago Arca",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)PAGOS? (?:AFIP|ARCA)\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "SAN_ARCA",
+      "bank": "Santander",
+      "priority": 40,
+      "detalle": "Pago Arca",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^PAGO DE SERVICIOS\\b"
+      ],
+      "predicate": null,
+      "note": "La segunda línea del movimiento es necesaria. PAGO DE SERVICIOS solo no identifica el beneficiario.",
+      "secondary_patterns": [
+        "^IMP (?:AFIP|ARCA)\\b"
+      ]
+    },
+    {
+      "id": "COMMON_OWN_ID",
+      "bank": "*",
+      "priority": 45,
+      "detalle": "Transferencia entre cuentas",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [],
+      "predicate": "own_counterparty",
+      "note": "Comparar la contraparte de una transferencia con razón social, alias declarados, CUIT o referencias de cuentas propias configuradas. No fijar nombres, CUIT ni números de cuenta en las reglas del banco."
+    },
+    {
+      "id": "GAL_OWN_EXPLICIT",
+      "bank": "Galicia",
+      "priority": 46,
+      "detalle": "Transferencia entre cuentas",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^TRANSF PROPIAS\\b",
+        "^TRANSFER MISMA TITULARIDAD\\b",
+        "^TRANSFERENCIA DE CUENTA PROPIA\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BBVA_OWN_EXPLICIT",
+      "bank": "BBVA",
+      "priority": 46,
+      "detalle": "Transferencia entre cuentas",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)MOVIM(?:IENTO)? ENTRE CUENTAS\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BCR_OWN_EXPLICIT",
+      "bank": "Bancor",
+      "priority": 46,
+      "detalle": "Transferencia entre cuentas",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^TRANS CR P IN PL M T\\b"
+      ],
+      "predicate": null,
+      "note": "Los tres casos de esta familia se asignaron a una cuenta bancaria propia. Muestra pequeña."
+    },
+    {
+      "id": "GAL_PAYROLL",
+      "bank": "Galicia",
+      "priority": 50,
+      "detalle": "Sueldos a Pagar",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^SERVICIO ACREDITAMIENTO DE HABERES\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BBVA_PAYROLL",
+      "bank": "BBVA",
+      "priority": 50,
+      "detalle": "Sueldos a Pagar",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)(?:DEBITO POR PAGO DE HABERES|DB CR POR PAGO DE SUELDOS)\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BBVA_PAYROLL_SERVICE_REVIEW",
+      "bank": "BBVA",
+      "priority": 51,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "decision_usuario",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)GESTION DE SUELDOS CLI AJEN\\b"
+      ],
+      "predicate": null,
+      "note": "15 casos históricos están en sueldos. Milo eligió #N/D hasta confirmar la naturaleza del cargo."
+    },
+    {
+      "id": "COMMON_CASH_EXPLICIT",
+      "bank": "*",
+      "priority": 55,
+      "detalle": "Caja",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "decision_usuario",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)(?:DEP|DEPOSITO)(?: EN)? EFECTIVO\\b",
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)(?:RETIRO|EXTRACCION)(?: EN)? (?:EFECTIVO|EFVO)\\b"
+      ],
+      "predicate": null,
+      "note": "Milo confirmó Caja para depósitos explícitos de efectivo, incluso donde el histórico decía ventas."
+    },
+    {
+      "id": "BCR_CASH_ATM",
+      "bank": "Bancor",
+      "priority": 55,
+      "detalle": "Caja",
+      "directions": [
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^DEPOSITO ATM PROPIO\\b"
+      ],
+      "predicate": null,
+      "note": "Observado en Bancor. No extender automáticamente a autoservicio de otros bancos."
+    },
+    {
+      "id": "GAL_RETURN_CUSTOMER_CHEQUE",
+      "bank": "Galicia",
+      "priority": 60,
+      "detalle": "Deudores por venta",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^RECHAZO CH\\b.*\\bBOLETA\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BBVA_RETURN_CUSTOMER_CHEQUE",
+      "bank": "BBVA",
+      "priority": 60,
+      "detalle": "Deudores por venta",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)CHEQUE (?:48\\s*HS|BF) DEVUELTO\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "NAC_RETURN_OWN_CHEQUE",
+      "bank": "Nacion",
+      "priority": 60,
+      "detalle": "Proveedores",
+      "directions": [
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^RECH CHQ DE CLEARING ONL\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BBVA_RETURN_OWN_CHEQUE",
+      "bank": "BBVA",
+      "priority": 60,
+      "detalle": "Proveedores",
+      "directions": [
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)CHEQUE RECHAZADO 48\\s*HS\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "GAL_RETURN_SUPPLIER_TRANSFER",
+      "bank": "Galicia",
+      "priority": 60,
+      "detalle": "Proveedores",
+      "directions": [
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^ANULACION DE TRANSFERENCIA O BCO\\b",
+        "^ANULACION DEBITOS\\b"
+      ],
+      "predicate": null,
+      "note": "3 ejemplos de devoluciones a proveedores. ANULACION DEBITOS no identifica la operación original en forma universal; revisar nuevos casos de esta familia."
+    },
+    {
+      "id": "NAC_AMBIGUOUS_TRANSFER",
+      "bank": "Nacion",
+      "priority": 70,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^BCA E TR O BCO\\b",
+        "^DEB TRAN INTERB LINK TIT\\b"
+      ],
+      "predicate": "unresolved_counterparty",
+      "note": "BCA: 30 ventas y 17 transferencias propias. LINK TIT: 20 propias y 1 proveedor. Requiere identidad de contraparte o información externa verificada; no memorizar referencias ni usar el importe."
+    },
+    {
+      "id": "BCR_AMBIGUOUS_TRANSFER",
+      "bank": "Bancor",
+      "priority": 70,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^TRANSF HB EXENTO\\b"
+      ],
+      "predicate": "unresolved_counterparty",
+      "note": "Mismo texto: 8 transferencias propias y 3 proveedores. Exento no determina una cuenta contable."
+    },
+    {
+      "id": "GAL_AMBIGUOUS_INCOMPLETE",
+      "bank": "Galicia",
+      "priority": 70,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^TRANSF$"
+      ],
+      "predicate": "unresolved_counterparty",
+      "note": "TRANSF. solo aparece con proveedores y con SICORE. Requiere datos de contraparte; no convertir cualquier transferencia incompleta en proveedores."
+    },
+    {
+      "id": "COMMON_UNHANDLED_FCI_REVIEW",
+      "bank": "*",
+      "priority": 73,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "control_preventivo_sin_muestras_nuevas",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)(?:RESCATE|SUSCRIPCION|OPER(?:ACION)?)(?: DE)? (?:FIMA|FCI|FONDOS? COMUN(?:ES)? (?:DE )?INVERS\\w*)\\b"
+      ],
+      "predicate": null,
+      "note": "Una familia explícita de FCI sin regla validada para ese banco queda pendiente. Las reglas observadas de Galicia/BBVA/Santander se aplican antes. No buscar FIMA en nombres de contrapartes."
+    },
+    {
+      "id": "COMMON_UNHANDLED_REVERSAL_REVIEW",
+      "bank": "*",
+      "priority": 74,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "control_preventivo_sin_muestras_nuevas",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)(?:DEV(?:OLUCION)?|REINTEGRO|ANULACION|REVERSO)\\b",
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)CHEQUE\\b.*\\b(?:DEVUELTO|RECHAZADO)\\b"
+      ],
+      "predicate": null,
+      "note": "Una devolución o rechazo sin regla específica validada queda pendiente. No convertir una devolución desconocida en ventas por ser crédito."
+    },
+    {
+      "id": "COMMON_OUTSIDE_SCOPE",
+      "bank": "*",
+      "priority": 75,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)IMPUESTO (?:DE )?SELLOS\\b",
+        "^DEB SELLADO\\b",
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)INTERES(?:ES)? (?:NOMINAL|SOBRE|SALDO|POR)\\b",
+        "^INTERESES\\b",
+        "^DEB X INTE SDO DEUDO\\b",
+        "^CUOTA DE PRESTAMO\\b",
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)MULTA\\b",
+        "^(?:PRESTAMO|ACREDITACION (?:DE )?PRESTAMO)\\b"
+      ],
+      "predicate": null,
+      "note": "Intereses bancarios, sellos, multas y préstamos tienen cuentas fuera de los 13 detalles. No agruparlos en gastos bancarios ni proveedores."
+    },
+    {
+      "id": "COMMON_PLAZO_FIJO_REVIEW",
+      "bank": "*",
+      "priority": 76,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "\\bPLAZO FIJO\\b"
+      ],
+      "predicate": null,
+      "note": "Evitar que un vencimiento sin regla validada termine en ventas. Este bloqueo queda detrás de la regla propuesta cuando se active."
+    },
+    {
+      "id": "GAL_PAYMENTS",
+      "bank": "Galicia",
+      "priority": 80,
+      "detalle": "Proveedores",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^TRF INMED PROVEED\\b",
+        "^DEB AUTOM DE\\b",
+        "^DE SERVICIOS\\b",
+        "^DEBITO DEBIN\\b",
+        "^ECHEQ (?:48 HS|GALICIA)\\b",
+        "^TRANSF$",
+        "^EMPRESA D A AL VTO BUSINESS\\b"
+      ],
+      "predicate": null,
+      "note": "Dirección débito y familia de pago. Las transferencias propias y las contrapartes excluidas se resolvieron antes."
+    },
+    {
+      "id": "BBVA_PAYMENTS",
+      "bank": "BBVA",
+      "priority": 80,
+      "detalle": "Proveedores",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:(?:[DC]\\s+)?(?:\\d+\\s+)?)(?:TRANSFERENCIA|TRANSF CLIENTE CTA|CR DB DEBIN|MOVIMIENTO DEBIN|DEBITO DIRECTO|PAGO CHEQUE|PAGO DE SERVICIOS TARJETA|CUENTA VISA NRO)\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "SAN_PAYMENTS",
+      "bank": "Santander",
+      "priority": 80,
+      "detalle": "Proveedores",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^DEBITO TRANSF ONLINE BANKING EMP\\b",
+        "^TRANSFERENCIA REALIZADA\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "NAC_PAYMENTS",
+      "bank": "Nacion",
+      "priority": 80,
+      "detalle": "Proveedores",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:24|48)\\s*HS (?:BANCOS|AGENCIA|CANJE ZONAL)\\b",
+        "^DEB TRAN INTERB LINK\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "BCR_PAYMENTS",
+      "bank": "Bancor",
+      "priority": 80,
+      "detalle": "Proveedores",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^CH CAM RECIB ACH ECH\\b",
+        "^DEB TRANS BANCON JUD\\b",
+        "^TRANSF HB EXENTO\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "COMMON_RESIDUAL_CREDIT",
+      "bank": "*",
+      "priority": 90,
+      "detalle": "Deudores por venta",
+      "directions": [
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "regla_negocio_usuario",
+      "description_patterns": [],
+      "predicate": "residual_credit",
+      "note": "Regla de negocio de Milo: créditos restantes luego de inversiones, efectivo, transferencias propias, devoluciones y exclusiones. No es una afirmación contable universal."
+    }
+  ],
+  "evidence_note": "Los ejemplos y conteos de evidencia citan clientes reales y se conservan solo en la copia local (public/conciliaciones_bancarias/). Esta copia tiene las mismas reglas."
+}

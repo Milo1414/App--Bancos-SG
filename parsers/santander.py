@@ -11,6 +11,9 @@ import re
 from utils import pdf_to_text, parse_num, mes_from_fecha, normalizar_fecha, extraer_saldo_inicial
 from parsers import registrar_parser
 
+# Número de página del pie ("5 - 16"), que a veces queda como continuación.
+RE_NRO_PAGINA = re.compile(r"^\d+\s*-\s*\d+$")
+
 
 @registrar_parser("santander")
 def parser_santander(pdf_path: str) -> tuple:
@@ -71,9 +74,15 @@ def parser_santander(pdf_path: str) -> tuple:
             if (movimientos
                     and "$" not in stripped
                     and not any(x in stripped for x in SKIP)):
-                movimientos[-1]["descripcion"] = (
-                    movimientos[-1]["descripcion"] + " " + " ".join(stripped.split())
-                ).strip()
+                texto = " ".join(stripped.split())
+                ultimo = movimientos[-1]
+                ultimo["descripcion"] = (ultimo["descripcion"] + " " + texto).strip()
+                # Además se guarda aparte (sin el número de página "5 - 16"
+                # del pie): es la segunda línea bancaria que usa la
+                # categorización (ej. PAGO DE SERVICIOS + "IMP.AFIP: ...").
+                if not RE_NRO_PAGINA.match(texto):
+                    previa = ultimo["descripcion_secundaria"]
+                    ultimo["descripcion_secundaria"] = f"{previa} {texto}" if previa else texto
             continue
 
         # Línea con fecha al inicio.
@@ -116,6 +125,10 @@ def parser_santander(pdf_path: str) -> tuple:
         movimientos.append({
             "mes": mes, "fecha": fecha, "descripcion": descripcion,
             "debito": debito, "credito": credito, "saldo": saldo,
+            # Primera línea del movimiento y sus continuaciones, por separado.
+            # "descripcion" (lo que se exporta) sigue siendo la unión de ambas.
+            "descripcion_operativa": descripcion,
+            "descripcion_secundaria": None,
         })
         diagnostico.movimientos_parseados += 1
 

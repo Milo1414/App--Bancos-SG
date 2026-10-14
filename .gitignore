@@ -9,3 +9,7 @@ __pycache__/
 # Archivos temporales / de salida
 *.xlsx
 !INSTRUCCIONES*.xlsx
+
+# Datos reales de clientes (extractos, conciliaciones, capturas originales).
+# Sólo locales: nunca se suben. Lo que la app necesita está en assets/.
+public/

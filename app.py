@@ -25,12 +25,20 @@ USO:
 
 import streamlit as st
 import streamlit.components.v1 as components
+import copy
+import html
+import json
 import os
 import tempfile
 
 from utils import motores_faltantes
 from parsers import PARSERS
 from excel import generar_excel
+from conciliacion import (
+    PENDIENTE, banco_catalogo, MACRO, cargar_catalogo, clasificar_hojas,
+    nombre_perfil, pendientes_por_hoja, perfil_vacio, reporte_pendientes_csv,
+    validar_perfil,
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -42,11 +50,15 @@ from excel import generar_excel
 # ─────────────────────────────────────────────────────────────────────────────
 
 _RAIZ = os.path.dirname(os.path.abspath(__file__))
-CAPTURAS_DIR = os.path.join(_RAIZ, "public", "Captura bancos")
+# Las capturas (con datos ficticios) y el logo viven en assets/, que se
+# versiona. public/ queda sólo en local: tiene extractos reales y no se sube.
+CAPTURAS_DIR = os.path.join(_RAIZ, "assets", "capturas")
 
-# El logo vive en public/, pero puede estar en la raíz en instalaciones viejas.
+# El logo vive en assets/; public/ y la raíz quedan por instalaciones viejas.
 LOGO = next(
-    (r for r in (os.path.join(_RAIZ, "public", "sg.jpg"), os.path.join(_RAIZ, "sg.jpg"))
+    (r for r in (os.path.join(_RAIZ, "assets", "sg.jpg"),
+                 os.path.join(_RAIZ, "public", "sg.jpg"),
+                 os.path.join(_RAIZ, "sg.jpg"))
      if os.path.exists(r)),
     "",
 )
@@ -131,6 +143,78 @@ def sufijo_cuenta(cuenta: str) -> str:
         return f"{int(ultimo.split('/')[0])}-{ultimo.split('/')[-1]}"
     partes = cuenta.split("-")
     return "-".join(partes[2:]) if len(partes) > 3 else cuenta
+
+
+@st.cache_resource
+def catalogo_reglas():
+    """Catálogo de reglas, cargado y validado una vez (no depende del cliente)."""
+    return cargar_catalogo()
+
+
+def perfil_de_hoja(nombre: str):
+    return (st.session_state.meta_hojas.get(nombre) or {}).get("perfil")
+
+
+def _perfil_a_texto(perfil: dict) -> str:
+    return json.dumps(perfil, ensure_ascii=False, indent=2)
+
+
+def _vaciar_perfil():
+    st.session_state.perfil_actual = perfil_vacio()
+    st.session_state.perfil_json = _perfil_a_texto(st.session_state.perfil_actual)
+    st.session_state.perfil_avisos = []
+    st.session_state.perfil_error = None
+
+
+def _hay_cambios_sin_aplicar() -> bool:
+    try:
+        return json.loads(st.session_state.perfil_json or "{}") != st.session_state.perfil_actual
+    except json.JSONDecodeError:
+        return True
+
+
+def _aplicar_perfil():
+    try:
+        datos = json.loads(st.session_state.perfil_json or "{}")
+        perfil, avisos = validar_perfil(datos)
+    except (json.JSONDecodeError, ValueError) as e:
+        st.session_state.perfil_error = str(e)
+        return
+    st.session_state.perfil_actual = perfil
+    st.session_state.perfil_avisos = avisos
+    st.session_state.perfil_error = None
+
+
+def seccion_perfil():
+    """Perfil del cliente (estructura de config_cliente_ejemplo.json).
+
+    Se copia a cada hoja al agregarla. Cambiarlo acá NO toca las hojas ya
+    cargadas: para eso está "Recategorizar" en la lista de hojas.
+    """
+    perfil = st.session_state.perfil_actual
+    with st.expander(f"👤 Perfil del cliente: {nombre_perfil(perfil)}"):
+        st.caption(
+            "Razón social, alias, CUIT y cuentas propias, contrapartes excluidas o "
+            "verificadas. Las listas vacías significan *dato no configurado*: no se "
+            "completan con los de otra empresa."
+        )
+        subido = st.file_uploader("Cargar perfil (.json)", type=["json"], key="perfil_archivo")
+        if subido is not None and st.session_state.get("perfil_archivo_id") != subido.file_id:
+            st.session_state.perfil_archivo_id = subido.file_id
+            st.session_state.perfil_json = subido.getvalue().decode("utf-8-sig")
+        st.text_area("Perfil (JSON)", key="perfil_json", height=260)
+        col_ok, col_vacio = st.columns(2)
+        with col_ok:
+            st.button("Aplicar perfil", on_click=_aplicar_perfil, use_container_width=True)
+        with col_vacio:
+            st.button("Vaciar perfil", on_click=_vaciar_perfil, use_container_width=True)
+        if st.session_state.perfil_error:
+            st.error(f"Perfil inválido — no se aplicó:\n\n{st.session_state.perfil_error}")
+        elif _hay_cambios_sin_aplicar():
+            st.warning("Hay cambios sin aplicar: las hojas nuevas usarán el perfil anterior "
+                       "hasta que pulses «Aplicar perfil».")
+        for aviso in st.session_state.perfil_avisos:
+            st.warning(aviso)
 
 
 def captura_banco(clave: str):
@@ -225,8 +309,16 @@ def main():
         st.session_state.hojas = {}
     if "uploader_key" not in st.session_state:
         st.session_state.uploader_key = 0
+    # Metadatos por hoja, en paralelo a `hojas`: {nombre: {"perfil": {...}}}.
+    # Cada hoja conserva la copia del perfil con el que se cargó.
+    if "meta_hojas" not in st.session_state:
+        st.session_state.meta_hojas = {}
+    if "perfil_actual" not in st.session_state:
+        _vaciar_perfil()
 
     st.divider()
+
+    seccion_perfil()
 
     # ── Formulario para agregar una hoja ──
     st.subheader("📄 Agregar extracto")
@@ -243,6 +335,12 @@ def main():
             "Nombre de la hoja",
             max_chars=31,
             key="nombre_hoja",
+        )
+
+    if banco_catalogo(banco) == MACRO:
+        st.info(
+            "Macro: la extracción funciona, pero todavía no hay reglas de categorización "
+            "validadas para este banco. Su columna Detalle quedará en `#N/D`."
         )
 
     # ── Previsualización del banco elegido ──
@@ -291,7 +389,9 @@ def main():
 
                     try:
                         movs, diag = parser(tmp_path)
-                        todos_movs.extend(movs)
+                        # El banco que extrajo cada fila viaja con ella hasta la
+                        # categorización (no se deduce del nombre de la hoja).
+                        todos_movs.extend(dict(mov, banco=banco) for mov in movs)
                         diagnosticos.append((archivo.name, banco, diag))
                     finally:
                         if os.path.exists(tmp_path):
@@ -384,11 +484,13 @@ def main():
                 for mov in todos_movs:
                     movs_por_cuenta[mov.get("cuenta") or ""].append(mov)
 
+                perfil_hoja = st.session_state.perfil_actual
                 if len(movs_por_cuenta) > 1:
                     hojas_agregadas = []
                     for cuenta, movs in movs_por_cuenta.items():
                         sheet_name = f"{base_name} - {sufijo_cuenta(cuenta)}"[:31]
                         st.session_state.hojas[sheet_name] = movs
+                        st.session_state.meta_hojas[sheet_name] = {"perfil": copy.deepcopy(perfil_hoja)}
                         hojas_agregadas.append((sheet_name, len(movs)))
                     resumen = " · ".join(f"<strong>{n}</strong> ({c:,})" for n, c in hojas_agregadas)
                     st.markdown(
@@ -398,6 +500,7 @@ def main():
                 else:
                     sheet_name = base_name[:31]
                     st.session_state.hojas[sheet_name] = todos_movs
+                    st.session_state.meta_hojas[sheet_name] = {"perfil": copy.deepcopy(perfil_hoja)}
                     st.markdown(
                         f'<div class="success-box">✅ <strong>{sheet_name}</strong>: '
                         f'{len(todos_movs):,} movimientos de {len(archivos)} PDF(s)</div>',
@@ -410,6 +513,25 @@ def main():
     if st.session_state.hojas:
         st.divider()
         st.subheader("📊 Hojas en el Excel")
+
+        # Categorización: cada fila con su propio banco y cada hoja con el
+        # perfil que guardó al cargarse (no el perfil ni el banco actuales).
+        try:
+            catalogo = catalogo_reglas()
+        except (OSError, ValueError) as e:
+            # Sin catálogo no se categoriza, pero la conversión a Excel sigue
+            # andando (Detalle queda en #N/D) y el problema queda a la vista.
+            st.error(f"No se pudo cargar el catálogo de reglas; la columna Detalle "
+                     f"quedará en {PENDIENTE}.\n\n{e}")
+            catalogo = None
+        if catalogo is not None:
+            hojas_con_detalle, reporte = clasificar_hojas(
+                st.session_state.hojas, st.session_state.meta_hojas, catalogo
+            )
+        else:
+            hojas_con_detalle, reporte = st.session_state.hojas, []
+        pendientes = (pendientes_por_hoja(reporte) if catalogo is not None
+                      else {n: len(m) for n, m in st.session_state.hojas.items()})
 
         for nombre, movs in st.session_state.hojas.items():
             debitos = sum(1 for m in movs if m["debito"] is not None)
@@ -424,7 +546,9 @@ def main():
                     f'{len(movs):,} movimientos &nbsp;·&nbsp; '
                     f'{debitos:,} débitos &nbsp;·&nbsp; '
                     f'{creditos:,} créditos &nbsp;·&nbsp; '
-                    f'Saldo final: {saldo_final:,.2f}'
+                    f'Saldo final: {saldo_final:,.2f}<br>'
+                    f'Perfil: {html.escape(nombre_perfil(perfil_de_hoja(nombre)))} &nbsp;·&nbsp; '
+                    f'{pendientes.get(nombre, 0):,} filas {PENDIENTE} pendientes'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -432,7 +556,31 @@ def main():
                 st.write("")  # Espaciado
                 if st.button("🗑️", key=f"del_{nombre}", help=f"Quitar {nombre}"):
                     del st.session_state.hojas[nombre]
+                    st.session_state.meta_hojas.pop(nombre, None)
                     st.rerun()
+
+        # ── Recategorizar: aplicar el perfil actual sólo a las hojas elegidas ──
+        with st.expander("🔁 Recategorizar con el perfil actual"):
+            st.caption(
+                f"Perfil actual: **{nombre_perfil(st.session_state.perfil_actual)}**. "
+                "Sólo cambia el perfil de las hojas que elijas; las demás conservan el suyo."
+            )
+            elegidas = st.multiselect("Hojas", options=list(st.session_state.hojas))
+            if st.button("Aplicar a las hojas elegidas", disabled=not elegidas):
+                for nombre in elegidas:
+                    st.session_state.meta_hojas[nombre] = {
+                        "perfil": copy.deepcopy(st.session_state.perfil_actual)
+                    }
+                st.rerun()
+
+        total_pend = sum(pendientes.values())
+        if total_pend and reporte:
+            st.download_button(
+                label=f"📋 Descargar reporte de pendientes ({total_pend:,} filas {PENDIENTE})",
+                data=reporte_pendientes_csv(reporte).encode("utf-8-sig"),  # BOM: Excel lee bien los acentos
+                file_name="reporte_categorizacion.csv",
+                mime="text/csv",
+            )
 
         # ── Botón de descarga ──
         st.divider()
@@ -444,26 +592,35 @@ def main():
         # dibujado, antes de que Streamlit reciba el texto nuevo). Con el form,
         # el nombre se confirma con Enter o con "Aplicar", y recién ahí se
         # redibuja el botón de descarga — que además muestra el nombre final.
+        #
+        # El nombre confirmado se guarda además en una clave propia
+        # ("nombre_archivo_ok"): los botones que hacen st.rerun() antes de
+        # llegar acá (quitar hoja, recategorizar) cortan la corrida sin dibujar
+        # el input, Streamlit descarta su estado y el botón volvía a
+        # "extractos_bancarios.xlsx" aunque el campo siguiera mostrando el
+        # nombre elegido.
+        st.session_state.setdefault("nombre_archivo_ok", "extractos_bancarios.xlsx")
         with st.form("form_nombre_archivo", border=False):
             col_txt, col_ok = st.columns([4, 1])
             with col_txt:
                 st.text_input(
                     "Nombre del archivo Excel",
-                    value="extractos_bancarios.xlsx",
+                    value=st.session_state.nombre_archivo_ok,
                     key="nombre_archivo",
                 )
             with col_ok:
                 st.write("")  # Espaciado para alinear con el input
                 st.form_submit_button("Aplicar", use_container_width=True)
+        st.session_state.nombre_archivo_ok = st.session_state.nombre_archivo
 
-        nombre_archivo = st.session_state.get("nombre_archivo", "").strip()
+        nombre_archivo = st.session_state.nombre_archivo_ok.strip()
         nombre_archivo = nombre_archivo or "extractos_bancarios.xlsx"
         if not nombre_archivo.lower().endswith(".xlsx"):
             nombre_archivo += ".xlsx"
 
         col_dl, col_clear = st.columns([3, 1])
         with col_dl:
-            excel_bytes = generar_excel(st.session_state.hojas)
+            excel_bytes = generar_excel(hojas_con_detalle)
             st.download_button(
                 label=f"⬇️ Descargar «{nombre_archivo}» ({len(st.session_state.hojas)} hojas)",
                 data=excel_bytes,
@@ -475,6 +632,7 @@ def main():
         with col_clear:
             if st.button("🔄 Limpiar", use_container_width=True, help="Borrar todas las hojas"):
                 st.session_state.hojas = {}
+                st.session_state.meta_hojas = {}
                 st.rerun()
 
     # ── Footer ──
