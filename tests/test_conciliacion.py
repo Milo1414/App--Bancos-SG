@@ -414,8 +414,8 @@ def _fila_macro(inicio, desc="", ref="", deb="", cred="", saldo=""):
 
 
 _ENCABEZADO_MACRO = f"{'FECHA':<9}{'DESCRIPCION':<45}{'REFERENCIA':>12}{'DEBITOS':>20}{'CREDITOS':>20}{'SALDO':>20}"
-# `-table` de Xpdf no respeta la columna de cada importe: el crédito de 500 cae
-# bajo DEBITOS y el débito de 200 bajo CREDITOS. El saldo decide la dirección.
+# Importes corridos de columna (como en el `-table` de Xpdf): el crédito de 500
+# cae bajo DEBITOS y el débito de 200 bajo CREDITOS. El saldo decide la dirección.
 TEXTO_MACROV1 = "\n".join([
     "CAJA DE AHORRO EN PESOS NRO.: 4-399-0000000001-1",
     "DETALLE DE MOVIMIENTO",
@@ -451,31 +451,52 @@ class ParserMacroV1(unittest.TestCase):
             movs, _ = self.macro.parser_macro("sintetico.pdf")
         return movs, pdf.call_args_list
 
-    def test_xpdf_table_primero_y_poppler_si_no_mejora_no_se_usa(self):
-        # El texto sintético tiene una fila que no encadena: se prueba Poppler,
-        # que da lo mismo, y queda el resultado de Xpdf.
-        self.assertEqual(self.llamadas, [mock.call("sintetico.pdf", table=True),
-                                         mock.call("sintetico.pdf", layout=True)])
+    def test_poppler_primero_y_xpdf_si_no_mejora_no_se_usa(self):
+        # El texto sintético tiene una fila que no encadena: se prueba Xpdf,
+        # que da lo mismo, y queda el resultado de Poppler.
+        self.assertEqual(self.llamadas, [mock.call("sintetico.pdf", layout=True),
+                                         mock.call("sintetico.pdf", table=True)])
 
-    def test_texto_limpio_no_consulta_poppler(self):
+    def test_texto_limpio_no_consulta_xpdf(self):
         limpio = "\n".join(l for l in TEXTO_MACROV1.split("\n") if "LIQ COMER" not in l)
-        movs, llamadas = self._parsear({"table": limpio, "layout": ""})
-        self.assertEqual(llamadas, [mock.call("sintetico.pdf", table=True)])
+        movs, llamadas = self._parsear({"layout": limpio, "table": ""})
+        self.assertEqual(llamadas, [mock.call("sintetico.pdf", layout=True)])
         self.assertEqual(len(movs), 3)
 
-    def test_poppler_gana_si_tiene_menos_problemas(self):
+    def test_xpdf_gana_si_tiene_menos_problemas(self):
         limpio = "\n".join(l for l in TEXTO_MACROV1.split("\n") if "LIQ COMER" not in l)
-        movs, _ = self._parsear({"table": TEXTO_MACROV1, "layout": limpio})
+        movs, _ = self._parsear({"layout": TEXTO_MACROV1, "table": limpio})
         self.assertEqual(len(movs), 3)
 
-    def test_sin_poppler_queda_xpdf(self):
+    def test_poppler_sin_movimientos_prueba_xpdf(self):
+        movs, llamadas = self._parsear({"layout": "", "table": TEXTO_MACROV1})
+        self.assertEqual(len(llamadas), 2)
+        self.assertEqual(len(movs), 4)
+
+    def test_si_xpdf_falla_queda_poppler(self):
         def falso(ruta, layout=True, table=False):
             if table:
-                return TEXTO_MACROV1
-            raise FileNotFoundError("pdftotext")
+                raise RuntimeError("pdftotext falló")
+            return TEXTO_MACROV1  # con un salto de saldo: dispara el respaldo
         with mock.patch.object(self.macro, "pdf_to_text", side_effect=falso):
             movs, _ = self.macro.parser_macro("sintetico.pdf")
         self.assertEqual(len(movs), 4)
+        with mock.patch.object(self.macro, "pdf_to_text",
+                               side_effect=lambda r, layout=True, table=False: "" if not table
+                               else (_ for _ in ()).throw(RuntimeError("falló"))):
+            with self.assertRaises(RuntimeError):  # sin nada de Poppler, el error se ve
+                self.macro.parser_macro("sintetico.pdf")
+
+    def test_sin_poppler_usa_xpdf(self):
+        for error in (FileNotFoundError("pdftotext"), RuntimeError("No se encontró Poppler")):
+            def falso(ruta, layout=True, table=False, error=error):
+                if table:
+                    return TEXTO_MACROV1
+                raise error
+            with self.subTest(error=type(error).__name__), \
+                    mock.patch.object(self.macro, "pdf_to_text", side_effect=falso):
+                movs, _ = self.macro.parser_macro("sintetico.pdf")
+                self.assertEqual(len(movs), 4)
 
     def test_direccion_por_saldo_y_cuentas(self):
         self.assertEqual(len(self.diag.lineas_descartadas), 0)
@@ -493,6 +514,101 @@ class ParserMacroV1(unittest.TestCase):
         self.assertEqual([m["detalle"] for m in hojas["M"]],
                          ["Deudores por venta", "imp 25.413", "Gastos y comisiones Bancarias",
                           "Deudores por venta"])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+class MotoresPdftotext(unittest.TestCase):
+    """Cada modo usa su motor, y el texto llega en UTF-8 (sin "�")."""
+
+    def setUp(self):
+        import utils
+        self.utils = utils
+        self.cache = dict(utils._cache_cmd)
+        utils._cache_cmd.clear()
+
+    def tearDown(self):
+        self.utils._cache_cmd.clear()
+        self.utils._cache_cmd.update(self.cache)
+
+    def _con_binarios(self, en_path, poppler):
+        u = self.utils
+        return (mock.patch.object(u, "_pdftotext_en_path", return_value=en_path),
+                mock.patch.object(u, "_POPPLER_CANDIDATOS", []),
+                mock.patch.object(u.os.path, "exists", return_value=True),
+                mock.patch.object(u, "_es_poppler", side_effect=lambda r: r in poppler))
+
+    def test_poppler_aunque_xpdf_este_primero_en_el_path(self):
+        a, b, c, d = self._con_binarios(["/git/pdftotext", "/poppler/pdftotext"], {"/poppler/pdftotext"})
+        with a, b, c, d:
+            self.assertEqual(self.utils._cmd_layout(), "/poppler/pdftotext")
+
+    def test_solo_xpdf_en_el_path_falta_poppler(self):
+        a, b, c, d = self._con_binarios(["/git/pdftotext"], set())
+        with a, b, c, d, mock.patch.object(self.utils, "_cmd_table", return_value="/git/pdftotext"):
+            with self.assertRaises(RuntimeError):
+                self.utils._cmd_layout()
+            self.assertEqual(self.utils.motores_faltantes(), ["poppler"])
+
+    def test_falta_de_poppler_se_recuerda(self):
+        a, b, c, d = self._con_binarios(["/git/pdftotext"], set())
+        with a as en_path, b, c, d:
+            for _ in range(3):
+                with self.assertRaises(RuntimeError):
+                    self.utils._cmd_layout()
+            self.assertEqual(en_path.call_count, 1)
+
+    def test_sonda_de_poppler_con_tiempo_maximo(self):
+        u = self.utils
+        with mock.patch.object(u.subprocess, "run",
+                               side_effect=subprocess.TimeoutExpired(["x", "-v"], 15)) as run:
+            self.assertFalse(u._es_poppler("x"))
+        self.assertEqual(run.call_args.kwargs["timeout"], 15)
+
+    def test_filtros_de_parsers_sin_palabras_con_tilde(self):
+        """Con UTF-8, una palabra con tilde en un filtro empezaría a coincidir y podría
+        descartar movimientos. Sólo Galicia las tiene, y siempre con su par «�»."""
+        import ast
+        encontrados = {}
+        for ruta in sorted((RAIZ / "parsers").glob("*.py")):
+            arbol = ast.parse(ruta.read_text(encoding="utf-8"))
+            docs = {id(n.body[0].value) for n in ast.walk(arbol)
+                    if isinstance(n, (ast.Module, ast.FunctionDef, ast.ClassDef)) and n.body
+                    and isinstance(n.body[0], ast.Expr) and isinstance(n.body[0].value, ast.Constant)}
+            for n in ast.walk(arbol):
+                if (isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs
+                        and any(ord(ch) > 127 for ch in n.value)):
+                    encontrados.setdefault(ruta.name, set()).add(n.value)
+        galicia = encontrados.pop("galicia.py")
+        # Mensajes de diagnóstico, no filtros de texto:
+        self.assertEqual(encontrados, {"macro.py": {"sin débito ni crédito"}})
+        for texto in galicia - {t for t in galicia if "�" in t}:
+            par = "".join("�" if ord(ch) > 127 else ch for ch in texto)
+            self.assertIn(par, galicia, texto)
+
+    def test_xpdf_escribe_utf8(self):
+        u = self.utils
+        hecho = subprocess.CompletedProcess([], 0, stdout="Energía de Córdoba", stderr="")
+        with mock.patch.object(u, "_cmd_table", return_value="xpdf"), \
+                mock.patch.object(u.subprocess, "run", return_value=hecho) as run:
+            self.assertEqual(u.pdf_to_text("x.pdf", table=True), "Energía de Córdoba")
+        self.assertEqual(run.call_args.args[0], ["xpdf", "-table", "-enc", "UTF-8", "x.pdf", "-"])
+        self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
+
+    def test_bbva_no_pierde_movimientos_con_tilde(self):
+        from parsers import bbva
+        texto = "\n".join([
+            "CC $ 267-000000/1 (Cta.Cte.Bancaria) - Iva-Responsable Inscripto",
+            "FECHA   ORIGEN   CONCEPTO                         DÉBITO      CRÉDITO      SALDO",
+            "        SALDO ANTERIOR                                                   1.000,00",
+            "02/01   D 500    PAGO TARJETA DE CRÉDITO          -100,00                  900,00",
+            "03/01            DÉBITO AUTOMÁTICO SEGURO           -50,00                  850,00",
+            "Transferencias",
+        ])
+        with mock.patch.object(bbva, "pdf_to_text", return_value=texto):
+            movs, _ = bbva.parser_bbva("sintetico.pdf")
+        self.assertEqual([(m["descripcion"], m["debito"], m["saldo"]) for m in movs],
+                         [("PAGO TARJETA DE CRÉDITO", 100.0, 900.0),
+                          ("DÉBITO AUTOMÁTICO SEGURO", 50.0, 850.0)])
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -81,14 +81,17 @@ def parser_bbva(pdf_path: str) -> tuple:
     fin_extracto  = False
     saldo_ini_por_cuenta = {}  # cuenta → saldo anterior (saldo inicial) informado
 
+    # Sin palabras con tilde ("DÉBITO", "CRÉDITO", "Página"): esta lista también
+    # se aplica a las líneas con fecha, y un movimiento como "PAGO TARJETA DE
+    # CRÉDITO" se perdería. Mientras Xpdf escribía Latin-1 nunca coincidían.
     SKIP = [
-        "FECHA", "ORIGEN", "CONCEPTO", "DÉBITO", "CRÉDITO",
+        "FECHA", "ORIGEN", "CONCEPTO",
         "SALDO ANTERIOR", "SALDO AL", "TOTAL MOVIMIENTOS",
-        "Sobre (", "Página", "Banco BBVA",
+        "Sobre (", "Banco BBVA",
         "Resumen", "Pymes y Negocios", "Cuentas y paquetes",
         "OCASA", "TIERRA", "PRES HIPOLITO", "DIGITAL", "OCRCU",
         "Cuenta Pyme", "CONSOLIDADO", "MANTENIMIENTO",
-        "BONIFICACIONES", "CUENTA DÉBITO", "Cta.Cte.Bancaria",
+        "BONIFICACIONES", "Cta.Cte.Bancaria",
         "Intervinientes", "CBU ", "Sucursal gestora", "DETALLE",
         "Movimientos en cuentas", "Saldo Consolidado",
         "Impuesto a los", "TOTAL COBRADO", "TOTAL DEV", "IMP. NETO",

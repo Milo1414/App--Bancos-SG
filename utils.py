@@ -17,14 +17,17 @@ from dataclasses import dataclass, field
 #
 #   · `-table`  → sólo existe en **Xpdf**. Es el que alinea bien las columnas
 #                 Débito/Crédito/Saldo de Galicia, Santander, Bancor, BBVA,
-#                 Nación, MacroV2 y MacroV1. En Linux se usa el binario
-#                 incluido en el repo (bin/pdftotext), porque el pdftotext de
-#                 Poppler que traen los servidores no soporta `-table`.
+#                 Nación y MacroV2 (y el respaldo de MacroV1). En Linux se usa
+#                 el binario incluido en el repo (bin/pdftotext), porque el
+#                 pdftotext de Poppler que traen los servidores no soporta
+#                 `-table`. Se pide `-enc UTF-8`: por defecto escribe Latin-1
+#                 y las letras con tilde llegaban como "�".
 #
-#   · `-layout` → se usa **Poppler**, sólo como respaldo de MacroV1: si con
-#                 `-table` el saldo no encadena, se prueba Poppler (extractos
-#                 MacroV1 anteriores reconciliaban así). El `-layout` de Xpdf
-#                 pierde la columna de importes en esos extractos.
+#   · `-layout` → se usa **Poppler** (MacroV1). El `-layout` de Xpdf, sobre los
+#                 extractos de MacroV1, PIERDE la columna de importes en buena
+#                 parte de las filas, así que Macro no reconcilia. El de
+#                 Poppler los conserva. Se identifica por su `-v` (no alcanza
+#                 con el primer pdftotext del PATH: Git para Windows trae Xpdf).
 #
 #  Por eso cada modo resuelve su propio ejecutable en vez de compartir uno.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -90,9 +93,56 @@ def _cmd_table() -> str:
     )
 
 
+# Rutas habituales de Poppler en Windows (las de las instrucciones de la app),
+# por si no está en el PATH o hay otro pdftotext antes.
+_POPPLER_CANDIDATOS = [
+    r"C:\poppler\Library\bin\pdftotext.exe",
+    r"C:\poppler\bin\pdftotext.exe",
+]
+
+
+def _es_poppler(exe: str) -> bool:
+    """True si `exe` es el pdftotext de Poppler (su `-v` lo nombra)."""
+    try:
+        salida = subprocess.run(
+            [exe, "-v"], capture_output=True, text=True, errors="replace", timeout=15
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return "poppler" in (salida.stdout + salida.stderr).lower()
+
+
+def _pdftotext_en_path() -> list:
+    """Todos los pdftotext del PATH, en orden (no sólo el primero)."""
+    nombre = "pdftotext.exe" if sys.platform.startswith("win") else "pdftotext"
+    rutas = []
+    for carpeta in os.environ.get("PATH", "").split(os.pathsep):
+        ruta = os.path.join(carpeta.strip('"'), nombre)
+        if carpeta and os.path.isfile(ruta) and ruta not in rutas:
+            rutas.append(ruta)
+    return rutas
+
+
 def _cmd_layout() -> str:
-    """Ejecutable Poppler (para -layout). Se toma el pdftotext del PATH."""
-    return _cache_cmd.setdefault("layout", "pdftotext")
+    """Ejecutable Poppler (para -layout). Lanza RuntimeError si no hay ninguno.
+
+    No alcanza con el primer pdftotext del PATH: Git para Windows trae el de
+    Xpdf, y si aparece antes, su `-layout` pierde importes sin dar error.
+    """
+    if "layout" not in _cache_cmd:
+        # También se guarda el "no está" (None): no se recorre el PATH en cada
+        # recarga. Si se instala Poppler, hay que reiniciar la app.
+        _cache_cmd["layout"] = next(
+            (r for r in _pdftotext_en_path() + _POPPLER_CANDIDATOS
+             if os.path.exists(r) and _es_poppler(r)),
+            None,
+        )
+    if _cache_cmd["layout"]:
+        return _cache_cmd["layout"]
+    raise RuntimeError(
+        "No se encontró el pdftotext de Poppler (el que usa MacroV1).\n"
+        "Un pdftotext de Xpdf en el PATH no sirve para este modo."
+    )
 
 
 def _pdftotext_cmd(table: bool = False) -> str:
@@ -104,13 +154,15 @@ def pdf_to_text(pdf_path: str, layout: bool = True, table: bool = False) -> str:
     """Convierte un PDF a texto usando pdftotext.
 
     modo:
-      - table=True   → 'pdftotext -table' con Xpdf (Galicia, Santander, Bancor,
-                       BBVA, Nación, MacroV2 y MacroV1).
-      - layout=True  → 'pdftotext -layout' con Poppler (respaldo de MacroV1).
+      - table=True   → 'pdftotext -table -enc UTF-8' con Xpdf (Galicia,
+                       Santander, Bancor, BBVA, Nación, MacroV2; respaldo de MacroV1).
+      - layout=True  → 'pdftotext -layout' con Poppler (MacroV1).
     """
     args = [_pdftotext_cmd(table=table)]
     if table:
-        args.append("-table")
+        # Xpdf escribe Latin-1 por defecto: leído como UTF-8, cada letra con
+        # tilde o ñ se volvía "�". Poppler ya escribe UTF-8.
+        args += ["-table", "-enc", "UTF-8"]
     elif layout:
         args.append("-layout")
     args += [pdf_path, "-"]
@@ -199,8 +251,8 @@ def motores_faltantes() -> list:
     """Devuelve los motores de pdftotext que faltan: 'poppler' y/o 'xpdf'."""
     faltan = []
     try:
-        subprocess.run([_cmd_layout(), "-v"], capture_output=True, text=True)
-    except OSError:
+        _cmd_layout()
+    except RuntimeError:
         faltan.append("poppler")
     try:
         _cmd_table()

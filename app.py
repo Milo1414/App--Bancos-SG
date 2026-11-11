@@ -214,25 +214,24 @@ def main():
 
     # ── Verificar los dos motores de pdftotext ──
     faltan = motores_faltantes()
-    if faltan:
-        mensaje = ["⚠️ **Falta al menos un motor de `pdftotext`.**\n"]
-        if "poppler" in faltan:
-            mensaje.append(
-                "**Poppler** (respaldo de MacroV1 para extractos anteriores):\n"
-                "1. Descargar desde: [poppler-windows](https://github.com/oschwartz10612/poppler-windows/releases)\n"
-                "2. Descomprimir en `C:\\poppler`\n"
-                "3. Agregar `C:\\poppler\\Library\\bin` al PATH del sistema\n"
-                "4. Reiniciar esta terminal y volver a ejecutar\n"
-            )
-        if "xpdf" in faltan:
-            mensaje.append(
-                "**Xpdf** (lo usan todos los bancos, porque necesitan la opción `-table`, "
-                "que Poppler no tiene):\n"
-                "1. Descargar desde: [xpdfreader.com](https://www.xpdfreader.com/download.html)\n"
-                "2. Copiar `pdftotext.exe` dentro de la carpeta `bin/` de esta aplicación\n"
-            )
-        st.error("\n".join(mensaje))
+    if "xpdf" in faltan:
+        st.error(
+            "⚠️ **Falta el `pdftotext` de Xpdf.**\n\n"
+            "Lo usan todos los bancos, porque necesitan la opción `-table`, que Poppler no tiene:\n"
+            "1. Descargar desde: [xpdfreader.com](https://www.xpdfreader.com/download.html)\n"
+            "2. Copiar `pdftotext.exe` dentro de la carpeta `bin/` de esta aplicación\n"
+        )
         st.stop()
+    if "poppler" in faltan:
+        # MacroV1 tiene respaldo con Xpdf, así que no se frena la app.
+        st.warning(
+            "**No se encontró el `pdftotext` de Poppler**, el motor principal de MacroV1. "
+            "MacroV1 va a usar Xpdf como respaldo. Para instalar Poppler:\n"
+            "1. Descargar desde: [poppler-windows](https://github.com/oschwartz10612/poppler-windows/releases)\n"
+            "2. Descomprimir en `C:\\poppler`\n"
+            "3. Agregar `C:\\poppler\\Library\\bin` al PATH del sistema\n"
+            "4. Reiniciar esta terminal y volver a ejecutar\n"
+        )
 
     # ── Estado de sesión para acumular hojas ──
     if "hojas" not in st.session_state:
@@ -537,7 +536,7 @@ def main():
     st.divider()
     st.caption(
         "Bancos soportados: Macro · Galicia · Santander · Bancor · BBVA · Nación &nbsp;|&nbsp; "
-        "Requiere Poppler instalado"
+        "Requiere pdftotext de Xpdf (y Poppler para MacroV1)"
     )
 
 

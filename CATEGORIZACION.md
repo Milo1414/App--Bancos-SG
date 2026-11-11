@@ -159,21 +159,48 @@ así que las reglas aceptan las dos formas.
   una cuenta. Es un conteo retrospectivo sobre el mismo corpus del que salieron
   las reglas, no una precisión garantizada.
 
-### Parser MacroV1
+### Parser MacroV1 y motores de pdftotext
 
-Con los extractos reales de 2026, el `-layout` (de Poppler o de Xpdf) desarma la
-tabla: los importes quedan en líneas aparte y la mitad de las filas se
-descartaba. Ahora `parsers/macro.py`:
+El parser MacroV1 de `v2` funcionaba bien con Poppler: con los dos PDF reales
+de 2026 da 256 y 6.386 movimientos, sin líneas descartadas y con el saldo
+encadenado. Una primera versión de este cambio lo pasó a Xpdf `-table` por un
+diagnóstico equivocado (en la consola de pruebas, el `pdftotext` del PATH era
+el Xpdf de Git y no Poppler). Quedó así:
 
-* usa primero el `-table` de Xpdf, que deja cada fila completa;
-* decide débito o crédito por el **saldo** (anterior ± importe), porque `-table`
-  no respeta la columna de cada importe. La posición respecto del encabezado
-  queda como respaldo cuando el saldo no cierra;
-* reconoce también la `CAJA DE AHORRO … NRO.:` como cuenta (antes sus filas
-  quedaban sin cuenta);
-* si con `-table` quedan líneas descartadas o saltos de saldo, prueba el
-  `-layout` de Poppler (el motor con que reconciliaban extractos anteriores) y
-  se queda con el resultado que tenga menos problemas.
+* **Motor principal: Poppler `-layout`**, como antes. Si falta Poppler, si no
+  hay movimientos, o si quedan líneas descartadas o saltos de saldo, prueba
+  Xpdf `-table` y se queda con el resultado que tenga menos problemas. En los
+  dos PDF reales los dos motores dan los mismos importes.
+* **Dirección por saldo:** si la fila trae importe y saldo, el saldo decide
+  (anterior + importe es crédito; anterior − importe, débito). La posición
+  respecto del encabezado queda para cuando el saldo no cierra.
+* **Caja de ahorro:** `CAJA DE AHORRO … NRO.:` ahora se reconoce como cuenta.
+  Antes sus filas quedaban sin cuenta (191 en uno de los PDF) y una caja de
+  ahorro en dólares se habría mezclado con la cuenta anterior en lugar de
+  descartarse.
+
+Arreglos de integridad que afectan a todos los bancos:
+
+* **Tildes y eñes:** Xpdf escribía Latin-1 y se leía como UTF-8, así que cada
+  letra con tilde llegaba como `�` (por ejemplo `Energ�a de C�rdoba`). Ahora se
+  pide `-enc UTF-8`. En los once PDF de ejemplo, el único cambio son 7
+  descripciones que ahora salen bien; importes, fechas y saldos son idénticos.
+* **BBVA:** su lista de líneas a saltear incluía `DÉBITO`, `CRÉDITO` y
+  `Página`, y se aplica también a los movimientos. Con el texto en UTF-8 esas
+  palabras habrían empezado a coincidir y un movimiento como «PAGO TARJETA DE
+  CRÉDITO» se habría perdido. Se quitaron: antes nunca coincidían, así que BBVA
+  se comporta igual que siempre.
+* **Detección de Poppler:** se reconoce por su `pdftotext -v`, recorriendo todo
+  el PATH. Antes se usaba el primer `pdftotext` del PATH aunque fuera Xpdf, y
+  MacroV1 perdía importes sin dar error. Si falta Poppler, la app avisa pero no
+  se frena, porque MacroV1 tiene respaldo; si falta Xpdf, se frena como antes.
+  La búsqueda se hace una vez por sesión (con tiempo máximo por ejecutable): si
+  se instala Poppler con la app abierta, hay que reiniciarla.
+* **Respaldo protegido:** si Poppler dio movimientos con algún problema y
+  después Xpdf falla, se devuelve lo de Poppler con su diagnóstico en lugar de
+  perder todo.
+* Una prueba recorre los textos de los parsers y falla si aparece una palabra
+  con tilde en un filtro (solo Galicia las tiene, siempre con su par `�`).
 
 ## Qué se verificó (14/10/2026)
 
@@ -184,7 +211,8 @@ descartaba. Ahora `parsers/macro.py`:
 | Once PDF → parser → clasificación → `generar_excel` → lectura del XLSX | 7.319 movimientos (10, 77, 12, 44, 34, 14, 164, 34, 288, 256 y 6.386), 0 líneas con fecha descartadas y el saldo encadenado en Decimal coincide en todas las filas. Todas las celdas Detalle son una de las 13 categorías o `#N/D` y son texto. |
 | A–I/J contra el `excel.py` original (copia en `tests/excel_original.py`) | Valores, fórmulas, formato numérico, fuentes, rellenos, alineación, bordes, anchos y `freeze_panes` iguales en las 6.267 celdas. La única diferencia es la columna Detalle agregada. |
 | `descripcion` de los parsers | Igual a la versión original en los nueve PDF, Santander incluido. |
-| Macro (11/11/2026) | Dos PDF MacroV1 reales: 256 y 6.386 movimientos (el segundo en dos cuentas), 0 líneas descartadas, saldo encadenado en todas las filas y saldo final igual al «SALDO FINAL AL DIA» del PDF. MacroV2: 164 filas, 138 con categoría. 49 casos sintéticos (`tests/casos_macro.json`), iguales a la referencia en detalle y regla. Las decisiones de los otros bancos no cambian (653 comparadas contra el catálogo anterior). |
+| Motores e integridad (11/11/2026) | Los once PDF, antes y después: mismos movimientos, fechas, importes, saldos, cuentas y Detalle; solo cambian 7 descripciones que ahora conservan las tildes. Un BBVA sintético con «PAGO TARJETA DE CRÉDITO» y «DÉBITO AUTOMÁTICO» pierde los dos movimientos con la lista anterior y los conserva con la nueva. Revisión Gentle AI (risk, resilience, reliability): aprobada; sus observaciones no bloqueantes se aplicaron. |
+| Macro (11/11/2026) | Dos PDF MacroV1 reales: 256 y 6.386 movimientos (el segundo en dos cuentas), 0 líneas descartadas, saldo encadenado en todas las filas y saldo final igual al «SALDO FINAL AL DIA» del PDF. Poppler y Xpdf `-table` dan los mismos importes en los dos. MacroV2: 164 filas, 138 con categoría. 49 casos sintéticos (`tests/casos_macro.json`), iguales a la referencia en detalle y regla. Las decisiones de los otros bancos no cambian (653 comparadas contra el catálogo anterior). |
 | Santander, segunda línea (sintético pasado por el parser real) | PAGO DE SERVICIOS + `IMP.AFIP: …` da Pago Arca (SAN_ARCA). Sin beneficiario o con otro servicio (EPEC) da `#N/D`. El número de página del pie no se toma como segunda línea y el titular/CUIT del encabezado no se adjunta. |
 | Santander real (extracto de 288 movimientos) con perfil de su titular (prueba del motor) | «Transf recibida cvu mismo titular … /CUIT propio» da Transferencia entre cuentas (COMMON_OWN_ID). |
 | Santander, tres familias corregidas (dos PDF → XLSX) | 23 propias, 42 haberes y 5 AFIP directo con su categoría; 7 «por cci» y 2 reversos en `#N/D`. Ver [docs/correccion_santander.md](docs/correccion_santander.md). |
@@ -200,9 +228,10 @@ descartaba. Ahora `parsers/macro.py`:
   precisión en extractos nuevos ni es una garantía contable. Los cinco Excel
   originales aparecieron después en `public/Conciliaciones Excels/` (solo
   locales), pero todavía no se usaron para recalcular.
-* Los extractos **MacroV1** anteriores, los que reconciliaban con Poppler, no
-  están en el proyecto: no se pudo comprobar con ellos el cambio a `-table`.
-  Para eso queda el respaldo automático con Poppler.
+* **BBVA** (pendiente, anterior a este cambio): la lista de líneas a saltear
+  también se aplica a los movimientos e incluye palabras como `MANTENIMIENTO`,
+  `RETENIDO` o `DIGITAL`. Un movimiento que las contenga se descartaría. En el
+  PDF de ejemplo no pasa; si pasara, se vería como Diferencia distinta de cero.
 * Las reglas de **MacroV2** que no tienen muestra conciliada propia
   (`MAC_IVA_PER_V2` y los textos sin prefijo) se dedujeron de MacroV1.
 * SAN_ARCA solo se probó con texto sintético: los PDF Santander disponibles no

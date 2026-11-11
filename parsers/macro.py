@@ -5,21 +5,19 @@
 #  Formato de tabla:
 #     FECHA | DESCRIPCION | REFERENCIA | DEBITOS | CREDITOS | SALDO
 #
-#  Motor: primero `pdftotext -table` de Xpdf. En los extractos de 2026, el
-#  `-layout` (de Xpdf o de Poppler) sale desarmado: los importes quedan en
-#  líneas aparte y corridos respecto de su fila. Con `-table` cada fila trae
-#  completa su fecha, su descripción, su importe y su saldo.
-#  Respaldo: extractos anteriores reconciliaban con el `-layout` de Poppler.
-#  Si con `-table` quedan líneas descartadas o el saldo no encadena, se prueba
-#  Poppler y se queda el resultado con menos problemas.
+#  Motor: `pdftotext -layout` de **Poppler** (el de Xpdf pierde importes en
+#  estos extractos). Respaldo: si con Poppler quedan líneas descartadas o el
+#  saldo no encadena (o Poppler no está), se prueba el `-table` de Xpdf y se
+#  queda el resultado con menos problemas. En los extractos de ejemplo los
+#  dos motores dan los mismos importes.
 #
-#  Dirección (débito o crédito): `-table` no respeta la columna de cada fila
-#  (un mismo importe puede quedar más a la izquierda o más a la derecha según
-#  la página), así que la dirección se decide por el SALDO: si el saldo de la
-#  fila es el anterior más el importe es un crédito; si es el anterior menos
-#  el importe, un débito. Sólo cuando esa cuenta no cierra (falta el saldo
-#  anterior o el banco imprimió el día en otro orden) se usa la posición del
-#  importe respecto del encabezado "FECHA ... DEBITOS ... CREDITOS ... SALDO".
+#  Dirección (débito o crédito): cuando la fila trae importe y saldo, la
+#  decide el SALDO: anterior + importe es un crédito; anterior − importe, un
+#  débito. Así no depende de en qué columna quedó el importe (el `-table` de
+#  Xpdf, por ejemplo, no respeta la columna). Si esa cuenta no cierra (falta
+#  el saldo anterior o el banco imprimió el día en otro orden), se usa la
+#  posición del importe respecto del encabezado
+#  "FECHA ... DEBITOS ... CREDITOS ... SALDO".
 #
 #  Un mismo PDF trae VARIAS cuentas (ej. "CUENTA CORRIENTE ESPECIAL EN PESOS",
 #  "CUENTA CORRIENTE BANCARIA" y la de DOLARES). Cada movimiento se etiqueta
@@ -58,16 +56,22 @@ def _columnas(line: str):
 
 @registrar_parser("macro")
 def parser_macro(pdf_path: str) -> tuple:
-    resultado = _parsear_texto(pdf_to_text(pdf_path, table=True))
-    problemas = _problemas(*resultado)
-    if problemas:
-        try:
-            respaldo = _parsear_texto(pdf_to_text(pdf_path, layout=True))
-        except (OSError, RuntimeError):
-            return resultado  # sin Poppler: queda el resultado de Xpdf
-        if _problemas(*respaldo) < problemas:
-            return respaldo
-    return resultado
+    try:
+        resultado = _parsear_texto(pdf_to_text(pdf_path, layout=True))
+    except (OSError, RuntimeError):
+        resultado = None  # sin Poppler: sólo queda Xpdf
+    if resultado is not None and resultado[0] and not _problemas(*resultado):
+        return resultado
+    # Sin Poppler, sin movimientos o con problemas: se prueba Xpdf `-table`.
+    try:
+        respaldo = _parsear_texto(pdf_to_text(pdf_path, table=True))
+    except (OSError, RuntimeError):
+        if resultado is not None and resultado[0]:
+            return resultado  # Xpdf falló: queda Poppler, con su diagnóstico
+        raise
+    if resultado is None or not resultado[0]:
+        return respaldo
+    return respaldo if _problemas(*respaldo) < _problemas(*resultado) else resultado
 
 
 def _problemas(movimientos, diagnostico) -> int:
