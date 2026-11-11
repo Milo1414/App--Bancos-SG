@@ -63,9 +63,7 @@ PREDICADOS = ("excluded_counterparty", "own_counterparty",
               "unresolved_counterparty", "residual_credit")
 
 # Clave del parser (o nombre del banco) → banco del catálogo.
-# Macro tiene parsers (MacroV1 y MacroV2) pero el catálogo no trae reglas
-# validadas para ese banco: se reconoce para dar un motivo claro, no se
-# "renombra" como otro banco.
+# MacroV1 y MacroV2 comparten las reglas de "Macro".
 MACRO = "Macro"
 _BANCOS = {
     "GALICIA": "Galicia", "BANCO GALICIA": "Galicia",
@@ -547,9 +545,6 @@ def _categorizar(m, perfil: _Perfil, cat: Catalogo) -> dict:
     if not m.get("banco"):
         return _pendiente("Banco de origen ausente")
     banco = banco_catalogo(m.get("banco"))
-    if banco == MACRO:
-        return _pendiente("Banco sin reglas validadas (Macro): falta un corpus etiquetado",
-                          banco=banco)
     if banco not in cat.bancos:
         return _pendiente("Banco no soportado")
     if not isinstance(m.get("descripcion"), str) or not m["descripcion"].strip():

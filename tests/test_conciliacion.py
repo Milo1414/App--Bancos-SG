@@ -17,6 +17,7 @@ import re
 import subprocess
 import sys
 import unittest
+from collections import Counter
 from decimal import Decimal
 from pathlib import Path
 from unittest import mock
@@ -99,7 +100,7 @@ class Catalogo(unittest.TestCase):
             "detalle fuera": self._con(id="X2", detalle="Cuenta contable nueva"),
             "detalle con espacio": self._con(id="X3", detalle="Proveedores "),
             "predicado": self._con(id="X4", predicate="adivinar_por_importe"),
-            "banco": self._con(id="X5", bank="Macro"),
+            "banco": self._con(id="X5", bank="Banco Inexistente"),
             "direccion": self._con(id="X6", directions=["Entrada"]),
             "sin condiciones": self._con(id="X7", description_patterns=[]),
         }
@@ -239,11 +240,12 @@ class EntradaYDireccion(unittest.TestCase):
         self.assertEqual(detalle(mov("BBVA", "IVA TASA GENERAL", debito=100)), "Iva Credito")
         self.assertEqual(detalle(mov("BBVA", "LEY NRO 25.413 SOBRE CREDIT", debito=100)), "imp 25.413")
 
-    def test_macro_sin_reglas(self):
-        for clave in ("macro", "macrov2"):
+    def test_macrov1_y_macrov2_comparten_reglas(self):
+        for clave in ("macro", "macrov2", "Macro"):
             d = C.categorizar_movimiento(mov(clave, "DEPOSITO EN EFECTIVO", credito=100), None, CATALOGO)
-            self.assertEqual(d["detalle"], "#N/D")
-            self.assertIn("Macro", d["motivo"])
+            self.assertEqual((d["detalle"], d["banco"]), ("Caja", "Macro"))
+            d = C.categorizar_movimiento(mov(clave, "DBCR 25413 S/DB TASA GRAL", debito=1), None, CATALOGO)
+            self.assertEqual((d["detalle"], d["regla_id"]), ("imp 25.413", "MAC_TAX_25413"))
 
     def test_importe_no_decide_la_categoria(self):
         for descripcion, banco, esperado in (("TRF INMED PROVEED ALGUIEN", "Galicia", "Proveedores"),
@@ -407,6 +409,93 @@ class ParserSantander(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+def _fila_macro(inicio, desc="", ref="", deb="", cred="", saldo=""):
+    return f"{inicio:<9}{desc:<45}{ref:>12}{deb:>20}{cred:>20}{saldo:>20}"
+
+
+_ENCABEZADO_MACRO = f"{'FECHA':<9}{'DESCRIPCION':<45}{'REFERENCIA':>12}{'DEBITOS':>20}{'CREDITOS':>20}{'SALDO':>20}"
+# `-table` de Xpdf no respeta la columna de cada importe: el crédito de 500 cae
+# bajo DEBITOS y el débito de 200 bajo CREDITOS. El saldo decide la dirección.
+TEXTO_MACROV1 = "\n".join([
+    "CAJA DE AHORRO EN PESOS NRO.: 4-399-0000000001-1",
+    "DETALLE DE MOVIMIENTO",
+    _ENCABEZADO_MACRO,
+    _fila_macro("", "SALDO ULTIMO EXTRACTO AL 30/04/2026", saldo="1.000,00"),
+    _fila_macro("04/05/26", "ING TRANSF:CLIENTE EJEMPLO-20111111112", "691391", deb="500,00", saldo="1.500,00"),
+    _fila_macro("04/05/26", "N/D DBCR 25413 S/DB TASA GRAL", "0", cred="200,00", saldo="1.300,00"),
+    "CUENTA CORRIENTE EN PESOS NRO.: 3-399-0000000002-2",
+    "DETALLE DE MOVIMIENTO",
+    _ENCABEZADO_MACRO,
+    _fila_macro("", "SALDO ULTIMO EXTRACTO AL 30/04/2026", saldo="100,00"),
+    _fila_macro("05/05/26", "COMISION TRANSFERE", "82401514", deb="50,00", saldo="50,00"),
+    # El saldo no cierra con el anterior: se decide por la posición del importe.
+    _fila_macro("05/05/26", "PAGO12345678-LIQ COMER PRISMA", "195774", cred="10,00", saldo="999,99"),
+    _fila_macro("", "SALDO FINAL AL DIA 29/05/2026", saldo="999,99"),
+])
+
+
+class ParserMacroV1(unittest.TestCase):
+
+    def setUp(self):
+        from parsers import macro
+        self.macro = macro
+        with mock.patch.object(macro, "pdf_to_text", return_value=TEXTO_MACROV1) as pdf:
+            self.movs, self.diag = macro.parser_macro("sintetico.pdf")
+        self.llamadas = pdf.call_args_list
+
+    def _parsear(self, textos):
+        """textos: {"table": ..., "layout": ...} → (movimientos, llamadas)."""
+        def falso(ruta, layout=True, table=False):
+            return textos["table" if table else "layout"]
+        with mock.patch.object(self.macro, "pdf_to_text", side_effect=falso) as pdf:
+            movs, _ = self.macro.parser_macro("sintetico.pdf")
+        return movs, pdf.call_args_list
+
+    def test_xpdf_table_primero_y_poppler_si_no_mejora_no_se_usa(self):
+        # El texto sintético tiene una fila que no encadena: se prueba Poppler,
+        # que da lo mismo, y queda el resultado de Xpdf.
+        self.assertEqual(self.llamadas, [mock.call("sintetico.pdf", table=True),
+                                         mock.call("sintetico.pdf", layout=True)])
+
+    def test_texto_limpio_no_consulta_poppler(self):
+        limpio = "\n".join(l for l in TEXTO_MACROV1.split("\n") if "LIQ COMER" not in l)
+        movs, llamadas = self._parsear({"table": limpio, "layout": ""})
+        self.assertEqual(llamadas, [mock.call("sintetico.pdf", table=True)])
+        self.assertEqual(len(movs), 3)
+
+    def test_poppler_gana_si_tiene_menos_problemas(self):
+        limpio = "\n".join(l for l in TEXTO_MACROV1.split("\n") if "LIQ COMER" not in l)
+        movs, _ = self._parsear({"table": TEXTO_MACROV1, "layout": limpio})
+        self.assertEqual(len(movs), 3)
+
+    def test_sin_poppler_queda_xpdf(self):
+        def falso(ruta, layout=True, table=False):
+            if table:
+                return TEXTO_MACROV1
+            raise FileNotFoundError("pdftotext")
+        with mock.patch.object(self.macro, "pdf_to_text", side_effect=falso):
+            movs, _ = self.macro.parser_macro("sintetico.pdf")
+        self.assertEqual(len(movs), 4)
+
+    def test_direccion_por_saldo_y_cuentas(self):
+        self.assertEqual(len(self.diag.lineas_descartadas), 0)
+        filas = [(m["cuenta"], m["descripcion"], m["debito"], m["credito"], m["saldo"]) for m in self.movs]
+        self.assertEqual(filas, [
+            ("4-399-0000000001-1", "ING TRANSF:CLIENTE EJEMPLO-20111111112", None, 500.0, 1500.0),
+            ("4-399-0000000001-1", "N/D DBCR 25413 S/DB TASA GRAL", 200.0, None, 1300.0),
+            ("3-399-0000000002-2", "COMISION TRANSFERE", 50.0, None, 50.0),
+            ("3-399-0000000002-2", "PAGO12345678-LIQ COMER PRISMA", None, 10.0, 999.99),
+        ])
+        self.assertEqual([m["saldo_inicial"] for m in self.movs], [1000.0, 1000.0, 100.0, 100.0])
+
+    def test_clasificacion_tras_el_adaptador(self):
+        hojas, _ = C.clasificar_hojas({"M": [dict(m, banco="macro") for m in self.movs]})
+        self.assertEqual([m["detalle"] for m in hojas["M"]],
+                         ["Deudores por venta", "imp 25.413", "Gastos y comisiones Bancarias",
+                          "Deudores por venta"])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 class Lotes(unittest.TestCase):
 
     def test_cada_hoja_con_su_banco_y_su_perfil(self):
@@ -507,6 +596,8 @@ PDFS = {
     "0c57d3f1379d796e": ("macrov2", 164),
     "23d7606f3d03935f": ("santander", 34),
     "0190cb4e17db0320": ("santander", 288),
+    "9c777e07542770b3": ("macro", 256),
+    "6f04f66864e4dee9": ("macro", 6386),  # dos cuentas: caja de ahorro y cuenta corriente
 }
 
 
@@ -584,7 +675,7 @@ class FlujoPDF(unittest.TestCase):
                     saldo += Decimal(str(m["credito"] or 0)) - Decimal(str(m["debito"] or 0))
                     self.assertEqual(saldo, Decimal(str(m["saldo"])).quantize(Decimal("0.01")))
             total += len(movs)
-        self.assertEqual(total, 677)
+        self.assertEqual(total, 7319)
         self.assertEqual(self.hojas, self.antes)
 
     def test_xlsx_final(self):
@@ -628,10 +719,29 @@ class FlujoPDF(unittest.TestCase):
             self.assertEqual(a.freeze_panes, b.freeze_panes)
         self.assertGreater(celdas, 6000)
 
-    def test_macrov2_sin_reglas(self):
-        rep = [d for d in self.reporte if d["hoja"] == "H6 macrov2"]
-        self.assertEqual(len(rep), 164)
-        self.assertTrue(all(d["detalle"] == "#N/D" and "Macro" in d["motivo"] for d in rep))
+    def test_macro_real(self):
+        """Distribución del Detalle en los extractos Macro de ejemplo (V2 y dos V1)."""
+        esperados = {
+            "0c57d3f1379d796e": {"imp 25.413": 34, "#N/D": 26, "Deudores por venta": 25,
+                                 "Gastos y comisiones Bancarias": 22, "Iva Credito": 19,
+                                 "Iva Percepcion": 18, "Retencion IIBB": 14, "Proveedores": 5, "Caja": 1},
+            "9c777e07542770b3": {"Deudores por venta": 173, "imp 25.413": 34, "Retencion IIBB": 15,
+                                 "#N/D": 12, "Proveedores": 9, "Gastos y comisiones Bancarias": 7,
+                                 "Fondo comun de Inversion": 3, "Iva Credito": 2, "Iva Percepcion": 1},
+            "6f04f66864e4dee9": {"Deudores por venta": 6144, "#N/D": 135, "imp 25.413": 39,
+                                 "Retencion IIBB": 37, "Proveedores": 27, "Fondo comun de Inversion": 4},
+        }
+        for h, conteo in esperados.items():
+            hoja = f"H{list(PDFS).index(h)} {PDFS[h][0]}"
+            rep = [d for d in self.reporte if d["hoja"] == hoja]
+            with self.subTest(hoja):
+                self.assertEqual(dict(Counter(d["detalle"] for d in rep)), conteo)
+                self.assertTrue(all(d["banco"] == "Macro" for d in rep))
+                # Los movimientos entre cuentas propias nunca terminan en ventas.
+                for d in rep:
+                    n = C.normalizar(d["descripcion"])
+                    if re.search(r"\b(?:MISMO|M) TIT(?:ULAR)?\b| AUT SDO\b", n):
+                        self.assertEqual((d["detalle"], d["regla_id"]), ("#N/D", "MAC_OWN_TRANSFER_REVIEW"))
 
     def test_santander_real_con_perfil(self):
         """Con perfil: «mismo titular» se resuelve por CUIT (COMMON_OWN_ID); «ctas propias», por texto."""
@@ -765,6 +875,69 @@ class CorreccionSantander(unittest.TestCase):
         recibida = mov("Santander", "Transferencia recibida", credito=10,
                        descripcion_secundaria="De socio ejemplo / varios - var / 20111111112")
         self.assertEqual(detalle(recibida, perfil), "Deudores por venta")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+CASOS_MACRO = json.loads(Path(__file__).with_name("casos_macro.json").read_text(encoding="utf-8"))
+
+
+class CategorizacionMacro(unittest.TestCase):
+    """Reglas de Macro (V1 y V2), tomadas del histórico conciliado de MacroV1."""
+
+    def test_casos_sinteticos(self):
+        self.assertEqual(len(CASOS_MACRO), 49)
+        for c in CASOS_MACRO:
+            with self.subTest(c["id"]):
+                d = C.categorizar_movimiento(c["movimiento"], c["config_cliente"], CATALOGO)
+                self.assertEqual((d["detalle"], d["regla_id"]), (c["detalle_esperado"], c["regla_esperada"]))
+                self.assertTrue(d["motivo"])
+
+    @sin_paquete
+    def test_misma_decision_que_la_referencia(self):
+        sys.path.insert(0, str(PAQUETE))
+        import motor_referencia as R
+        ref = R.cargar_catalogo(PAQUETE / "reglas_bancarias.json")
+        # La referencia es anterior a Macro: se le agregan sólo los alias, sin tocarla.
+        alias = {"MACRO": "Macro", "MACROV1": "Macro", "MACROV2": "Macro"}
+        with mock.patch.dict(R.BANK_ALIASES, alias):
+            for c in CASOS_MACRO:
+                a = C.categorizar_movimiento(c["movimiento"], c["config_cliente"], CATALOGO)
+                b = R.categorizar_movimiento(c["movimiento"], c["config_cliente"], ref)
+                self.assertEqual((a["detalle"], a["regla_id"]), (b["detalle"], b["regla_id"]), c["id"])
+
+    def test_reglas_en_el_catalogo(self):
+        self.assertIn("Macro", JSON_CATALOGO["banks"])
+        reglas = {r["id"]: r for r in JSON_CATALOGO["rules"] if r["bank"] == "Macro"}
+        self.assertEqual(len(reglas), 13)
+        self.assertTrue(all(r["enabled"] and r["status"] and r["note"] is not None for r in reglas.values()))
+        p = {r["id"]: r["priority"] for r in JSON_CATALOGO["rules"]}
+        # Mismo orden que los demás bancos: impuestos → comisiones → FCI → ARCA →
+        # revisiones → proveedores → crédito residual.
+        orden = ["MAC_TAX_25413", "MAC_IIBB", "MAC_IVA_PER", "MAC_IVA_CRED", "MAC_FEES", "MAC_FCI",
+                 "MAC_ARCA_SOCIAL", "MAC_OWN_TRANSFER_REVIEW", "MAC_PAYMENTS", "COMMON_RESIDUAL_CREDIT"]
+        self.assertEqual(orden, sorted(orden, key=p.get))
+        # TRF MO CCDO imprime el CUIT del propio titular: va antes de COMMON_OWN_ID.
+        self.assertLess(p["MAC_PAYMENTS_OTHER_HOLDER"], p["COMMON_OWN_ID"])
+        self.assertEqual(p["MAC_IVA_PER_V2"], p["MAC_IVA_PER"])
+
+    def test_importe_no_cambia_la_categoria(self):
+        for importe in ("0.01", "1", "123456789.99"):
+            self.assertEqual(detalle(mov("macro", "N/D RETENCION ING BRUTOS CORDOBA", debito=importe)),
+                             "Retencion IIBB")
+            self.assertEqual(detalle(mov("macrov2", "DB TR..AUT.SDO.MISMO TIT.", credito=importe)), "#N/D")
+
+    def test_entradas_invalidas(self):
+        for m in (mov("macro", "COMISION TRANSFERE", debito=float("nan")),
+                  mov("macro", "COMISION TRANSFERE", debito=-10),
+                  mov("macro", "COMISION TRANSFERE", debito=10, credito=10),
+                  mov("macro", "   ", debito=10)):
+            d = C.categorizar_movimiento(m, None, CATALOGO)
+            self.assertEqual((d["detalle"], d["regla_id"]), ("#N/D", None))
+            self.assertTrue(d["motivo"])
+
+    def test_otros_bancos_no_toman_reglas_de_macro(self):
+        self.assertEqual(detalle(mov("Santander", "N/D DBCR 25413 S/DB TASA GRAL", debito=1)), "#N/D")
+        self.assertEqual(detalle(mov("Galicia", "TRF MO CCDO DIST T", debito=1)), "#N/D")
 
 
 if __name__ == "__main__":

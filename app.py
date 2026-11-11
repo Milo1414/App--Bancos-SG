@@ -32,7 +32,7 @@ from utils import motores_faltantes
 from parsers import PARSERS
 from excel import generar_excel
 from conciliacion import (
-    PENDIENTE, banco_catalogo, MACRO, cargar_catalogo, clasificar_hojas,
+    PENDIENTE, cargar_catalogo, clasificar_hojas,
     pendientes_por_hoja, reporte_pendientes_csv,
 )
 
@@ -218,7 +218,7 @@ def main():
         mensaje = ["⚠️ **Falta al menos un motor de `pdftotext`.**\n"]
         if "poppler" in faltan:
             mensaje.append(
-                "**Poppler** (lo usa MacroV1):\n"
+                "**Poppler** (respaldo de MacroV1 para extractos anteriores):\n"
                 "1. Descargar desde: [poppler-windows](https://github.com/oschwartz10612/poppler-windows/releases)\n"
                 "2. Descomprimir en `C:\\poppler`\n"
                 "3. Agregar `C:\\poppler\\Library\\bin` al PATH del sistema\n"
@@ -226,8 +226,8 @@ def main():
             )
         if "xpdf" in faltan:
             mensaje.append(
-                "**Xpdf** (lo usan Galicia, Santander, Bancor, BBVA, Nación y MacroV2, "
-                "porque son los únicos que necesitan la opción `-table`, que Poppler no tiene):\n"
+                "**Xpdf** (lo usan todos los bancos, porque necesitan la opción `-table`, "
+                "que Poppler no tiene):\n"
                 "1. Descargar desde: [xpdfreader.com](https://www.xpdfreader.com/download.html)\n"
                 "2. Copiar `pdftotext.exe` dentro de la carpeta `bin/` de esta aplicación\n"
             )
@@ -257,12 +257,6 @@ def main():
             "Nombre de la hoja",
             max_chars=31,
             key="nombre_hoja",
-        )
-
-    if banco_catalogo(banco) == MACRO:
-        st.info(
-            "Macro: la extracción funciona, pero todavía no hay reglas de categorización "
-            "validadas para este banco. Su columna Detalle quedará en `#N/D`."
         )
 
     # ── Previsualización del banco elegido ──

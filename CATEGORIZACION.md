@@ -26,7 +26,7 @@ Registros de cambios: [corrección Santander](docs/correccion_santander.md)
 | `parsers/santander.py` | Ahora guarda también `descripcion_operativa` (primera línea) y `descripcion_secundaria` (continuaciones). `descripcion` exporta el mismo texto que antes. |
 | `excel.py` | Agrega la columna **Detalle** al final. |
 | `app.py` | Asigna a cada fila el banco con que se extrajo y clasifica antes de exportar, sin perfil de cliente. |
-| `tests/test_conciliacion.py`, `tests/casos_santander.json` | Regresiones: `python -m unittest discover -s tests -v`. |
+| `tests/test_conciliacion.py`, `tests/casos_santander.json`, `tests/casos_macro.json` | Regresiones: `python -m unittest discover -s tests -v`. |
 | `tests/ui_flujo_streamlit.py` | Recorrido de la interfaz con Playwright: `python tests/ui_flujo_streamlit.py`. |
 
 ## API de `conciliacion.py`
@@ -118,13 +118,62 @@ segunda línea de un PAGO DE SERVICIOS. «Pago de haberes por cci» no está
 autorizada y queda en `#N/D`. Detalle, prioridades, conteos y pruebas en
 [docs/correccion_santander.md](docs/correccion_santander.md).
 
-## Macro
+## Macro (11/11/2026)
 
-MacroV1 y MacroV2 siguen extrayendo igual que antes. El catálogo no tiene reglas
-validadas para Macro, así que sus movimientos quedan en `#N/D` con el motivo
-*Banco sin reglas validadas (Macro)*. La app lo avisa al elegir Macro en el
-selector. Para incorporarlo hacen falta extractos Macro con Detalle conciliado
-y casos esperados verificados.
+MacroV1 y MacroV2 comparten las reglas `MAC_*` del banco `Macro`. Salen de un
+histórico conciliado de MacroV1 (13.717 movimientos de 2024, en dos cuentas
+corrientes; solo local). Las cuentas contables del histórico se tradujeron a
+las 13 categorías. MacroV2 imprime casi los mismos textos sin el prefijo `N/D`,
+así que las reglas aceptan las dos formas.
+
+| Texto del banco | Dirección | Detalle | Regla (prioridad) |
+| --- | --- | --- | --- |
+| `DBCR 25413 S/DB`, `S/CR`, `IMPDBCR 25413` (con o sin `N/D`, `N/C`, `FV`) | Ambas | imp 25.413 | `MAC_TAX_25413` (10) |
+| `RETENCION ING BRUTOS CORDOBA`, `RETENCION IIBB CORDOBA RENTA` | Ambas | Retencion IIBB | `MAC_IIBB` (15) |
+| `RETENCION IVA PERCEPCION` (V1), `DEBITO FISCAL IVA PERCEPCION` (V2, sin muestra) | Ambas | Iva Percepcion | `MAC_IVA_PER`, `MAC_IVA_PER_V2` (20) |
+| `DEBITO FISCAL IVA BASICO` (el IVA sobre comisiones) | Ambas | Iva Credito | `MAC_IVA_CRED` (25) |
+| `COMISION …`, `MANTENIMIENTO …` | Ambas | Gastos y comisiones Bancarias | `MAC_FEES` (30) |
+| `Liq.Susc`, `Sol.Resc`, `Liq.Resc` | Ambas | Fondo comun de Inversion | `MAC_FCI` (35) |
+| `APORTES` / `CONTRIB` `SEG SOCIAL` / `OBRA SOCIAL` (F.931) | Débito | Pago Arca | `MAC_ARCA_SOCIAL` (40) |
+| `TRF MO CCDO DIST`, `N/D DB TRANSF MINORISTA DIST` | Débito | Proveedores | `MAC_PAYMENTS_OTHER_HOLDER` (44) |
+| Créditos de aportes y contribuciones | Crédito | `#N/D` | `MAC_ARCA_SOCIAL_CREDIT_REVIEW` (72) |
+| Entre cuentas del mismo titular: `… AUT SDO`, `M/TIT`, `MISMO TITULAR`, `COMPENSACION ENTRE TUS CUENTAS` | Ambas | `#N/D` | `MAC_OWN_TRANSFER_REVIEW` (72) |
+| `N/D TEF DATANET PAGOS` (IVA, IIBB o intereses con el mismo texto) | Ambas | `#N/D` | `MAC_DATANET_TAX_REVIEW` (72) |
+| `Transf. MacrOnline`, `TRANSF:<identificador>-<CUIT>` | Débito | Proveedores | `MAC_PAYMENTS` (80) |
+
+* **Créditos sin regla** (liquidaciones de tarjetas, `PAGO PCT`, `TRANSF` o
+  `CREDIN` de terceros, cheques depositados): pasan al crédito residual de
+  ventas (`COMMON_RESIDUAL_CREDIT`, 90), el mismo parámetro que en los demás
+  bancos. En el histórico ese residual coincidió en las 9.874 filas.
+* **Débitos sin regla** quedan en `#N/D`: débitos automáticos con nombre de
+  comercio o aseguradora, `AFIP`, ART, seguro de vida, tasas municipales,
+  sellos, intereses, préstamos, cheques emitidos, débitos de liquidaciones de
+  tarjeta y `TRANSF <CUIT> VAR`.
+* **Por qué `MAC_PAYMENTS_OTHER_HOLDER` va antes de `COMMON_OWN_ID`:** el CUIT
+  que imprime `TRF MO CCDO DIST T - <CUIT>` es el del ordenante, o sea el propio
+  titular (pasa en las 160 filas del histórico). Con un perfil cargado,
+  `COMMON_OWN_ID` convertiría esos pagos en transferencias propias.
+* **Contra el histórico:** el 97,09 % coincide (13.318 de 13.717). Solo 12 filas
+  reciben una categoría equivocada: transferencias MacrOnline que el histórico
+  imputó a una tasa municipal. Las otras 387 diferencias son `#N/D` en lugar de
+  una cuenta. Es un conteo retrospectivo sobre el mismo corpus del que salieron
+  las reglas, no una precisión garantizada.
+
+### Parser MacroV1
+
+Con los extractos reales de 2026, el `-layout` (de Poppler o de Xpdf) desarma la
+tabla: los importes quedan en líneas aparte y la mitad de las filas se
+descartaba. Ahora `parsers/macro.py`:
+
+* usa primero el `-table` de Xpdf, que deja cada fila completa;
+* decide débito o crédito por el **saldo** (anterior ± importe), porque `-table`
+  no respeta la columna de cada importe. La posición respecto del encabezado
+  queda como respaldo cuando el saldo no cierra;
+* reconoce también la `CAJA DE AHORRO … NRO.:` como cuenta (antes sus filas
+  quedaban sin cuenta);
+* si con `-table` quedan líneas descartadas o saltos de saldo, prueba el
+  `-layout` de Poppler (el motor con que reconciliaban extractos anteriores) y
+  se queda con el resultado que tenga menos problemas.
 
 ## Qué se verificó (14/10/2026)
 
@@ -132,16 +181,16 @@ y casos esperados verificados.
 | --- | --- |
 | `verificar_casos.py` (referencia, antes y después) | 108/108 |
 | Los 108 casos desde la API de `conciliacion.py` | 108/108. También coinciden `regla_id` y `motivo` con la referencia en los 108. |
-| Nueve PDF → parser → clasificación → `generar_excel` → lectura del XLSX | 677 movimientos (10, 77, 12, 44, 34, 14, 164, 34 y 288), 0 líneas con fecha descartadas y el saldo encadenado en Decimal coincide en todas las filas. Todas las celdas Detalle son una de las 13 categorías o `#N/D` y son texto. |
+| Once PDF → parser → clasificación → `generar_excel` → lectura del XLSX | 7.319 movimientos (10, 77, 12, 44, 34, 14, 164, 34, 288, 256 y 6.386), 0 líneas con fecha descartadas y el saldo encadenado en Decimal coincide en todas las filas. Todas las celdas Detalle son una de las 13 categorías o `#N/D` y son texto. |
 | A–I/J contra el `excel.py` original (copia en `tests/excel_original.py`) | Valores, fórmulas, formato numérico, fuentes, rellenos, alineación, bordes, anchos y `freeze_panes` iguales en las 6.267 celdas. La única diferencia es la columna Detalle agregada. |
 | `descripcion` de los parsers | Igual a la versión original en los nueve PDF, Santander incluido. |
-| MacroV2 | 164 filas extraídas, todas `#N/D` con el motivo de Macro. |
+| Macro (11/11/2026) | Dos PDF MacroV1 reales: 256 y 6.386 movimientos (el segundo en dos cuentas), 0 líneas descartadas, saldo encadenado en todas las filas y saldo final igual al «SALDO FINAL AL DIA» del PDF. MacroV2: 164 filas, 138 con categoría. 49 casos sintéticos (`tests/casos_macro.json`), iguales a la referencia en detalle y regla. Las decisiones de los otros bancos no cambian (653 comparadas contra el catálogo anterior). |
 | Santander, segunda línea (sintético pasado por el parser real) | PAGO DE SERVICIOS + `IMP.AFIP: …` da Pago Arca (SAN_ARCA). Sin beneficiario o con otro servicio (EPEC) da `#N/D`. El número de página del pie no se toma como segunda línea y el titular/CUIT del encabezado no se adjunta. |
 | Santander real (extracto de 288 movimientos) con perfil de su titular (prueba del motor) | «Transf recibida cvu mismo titular … /CUIT propio» da Transferencia entre cuentas (COMMON_OWN_ID). |
 | Santander, tres familias corregidas (dos PDF → XLSX) | 23 propias, 42 haberes y 5 AFIP directo con su categoría; 7 «por cci» y 2 reversos en `#N/D`. Ver [docs/correccion_santander.md](docs/correccion_santander.md). |
 | `auditoria_diferencias.csv` (261 filas) con perfil vacío | Las 181 filas que no dependen del perfil coinciden con la predicción de referencia (detalle y regla). Las 80 restantes son COMMON_OWN_ID y necesitan el perfil del cliente, que el CSV no incluye. |
 | Casos borde | Prefijos D/C, palabras IVA/CRÉDITO, prioridades frente al crédito residual, percepción antes de IVA, e-cheque de Nación, exclusión solo en débito, pies con impuestos y titular, familias ambiguas con y sin identidad, conflicto de igual prioridad, etiquetas históricas ignoradas, importe sin efecto dentro de una dirección, entradas inválidas, banco desconocido, Cuenta de origen sin uso como contraparte, catálogo y perfil sin mutar. |
-| Interfaz Streamlit con Playwright | Sin sección de perfil. Galicia, BBVA y Santander, cambiando el selector entre uno y otro. Cada hoja muestra sus pendientes y MacroV2 muestra el aviso. La descarga con nombre propio coincide celda a celda con `clasificar_hojas`: Detalle en J para Galicia y Santander, y en K para BBVA. Después se probó el CSV de pendientes, quitar una hoja (el nombre del archivo se conserva), renombrar, volver a descargar y limpiar. |
+| Interfaz Streamlit con Playwright | Sin sección de perfil. Galicia, BBVA y Santander, cambiando el selector entre uno y otro. Cada hoja muestra sus pendientes y MacroV2 ya no muestra el aviso de «sin reglas». Un MacroV1 de dos cuentas genera dos hojas cuyo Detalle coincide con `clasificar_hojas`. La descarga con nombre propio coincide celda a celda con `clasificar_hojas`: Detalle en J para Galicia y Santander, y en K para BBVA. Después se probó el CSV de pendientes, quitar una hoja (el nombre del archivo se conserva), renombrar, volver a descargar y limpiar. |
 
 ### Qué **no** se verificó
 
@@ -151,7 +200,11 @@ y casos esperados verificados.
   precisión en extractos nuevos ni es una garantía contable. Los cinco Excel
   originales aparecieron después en `public/Conciliaciones Excels/` (solo
   locales), pero todavía no se usaron para recalcular.
-* No hay un PDF de **MacroV1**, así que su parser no se probó con un archivo real.
+* Los extractos **MacroV1** anteriores, los que reconciliaban con Poppler, no
+  están en el proyecto: no se pudo comprobar con ellos el cambio a `-table`.
+  Para eso queda el respaldo automático con Poppler.
+* Las reglas de **MacroV2** que no tienen muestra conciliada propia
+  (`MAC_IVA_PER_V2` y los textos sin prefijo) se dedujeron de MacroV1.
 * SAN_ARCA solo se probó con texto sintético: los PDF Santander disponibles no
   incluyen un PAGO DE SERVICIOS con IMP.AFIP.
 * No se desplegó en Streamlit Cloud.

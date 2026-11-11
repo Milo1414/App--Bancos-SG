@@ -1,0 +1,647 @@
+[
+ {
+  "id": "MAC_25413_db_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D DBCR 25413 S/DB TASA GRAL",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "imp 25.413",
+  "regla_esperada": "MAC_TAX_25413"
+ },
+ {
+  "id": "MAC_25413_nc_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/C DBCR 25413 S/CR TASA GRAL",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "imp 25.413",
+  "regla_esperada": "MAC_TAX_25413"
+ },
+ {
+  "id": "MAC_25413_fv_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D FV IMPDBCR 25413 S/CR TASA GRA SUC.: 811",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "imp 25.413",
+  "regla_esperada": "MAC_TAX_25413"
+ },
+ {
+  "id": "MAC_25413_v2",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macrov2",
+   "descripcion": "DBCR 25413 S/CR TASA GRAL $",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "imp 25.413",
+  "regla_esperada": "MAC_TAX_25413"
+ },
+ {
+  "id": "MAC_25413_imp_v2",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macrov2",
+   "descripcion": "IMPDBCR 25413 S/DB TASA GRAL $",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "imp 25.413",
+  "regla_esperada": "MAC_TAX_25413"
+ },
+ {
+  "id": "MAC_IIBB_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D RETENCION ING BRUTOS CORDOBA SUC.: 811",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Retencion IIBB",
+  "regla_esperada": "MAC_IIBB"
+ },
+ {
+  "id": "MAC_IIBB_renta_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "RETENCION IIBB CORDOBA RENTA FINANC SUC.: 811",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Retencion IIBB",
+  "regla_esperada": "MAC_IIBB"
+ },
+ {
+  "id": "MAC_IIBB_v2",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macrov2",
+   "descripcion": "RETENCION ING BRUTOS CORDOBA $",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Retencion IIBB",
+  "regla_esperada": "MAC_IIBB"
+ },
+ {
+  "id": "MAC_IIBB_devolucion_v2",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macrov2",
+   "descripcion": "DEV RET ING BRUTOS $",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": "COMMON_UNHANDLED_REVERSAL_REVIEW"
+ },
+ {
+  "id": "MAC_IVA_PER_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "RETENCION IVA PERCEPCION",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Iva Percepcion",
+  "regla_esperada": "MAC_IVA_PER"
+ },
+ {
+  "id": "MAC_IVA_PER_v2",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macrov2",
+   "descripcion": "DEBITO FISCAL IVA PERCEPCION $",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Iva Percepcion",
+  "regla_esperada": "MAC_IVA_PER_V2"
+ },
+ {
+  "id": "MAC_IVA_CRED_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "DEBITO FISCAL IVA BASICO",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Iva Credito",
+  "regla_esperada": "MAC_IVA_CRED"
+ },
+ {
+  "id": "MAC_IVA_CRED_v2",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macrov2",
+   "descripcion": "DEBITO FISCAL IVA BASICO $",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Iva Credito",
+  "regla_esperada": "MAC_IVA_CRED"
+ },
+ {
+  "id": "MAC_FEES_trf_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D Comision Trf. MacrOL E-set 12345678",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Gastos y comisiones Bancarias",
+  "regla_esperada": "MAC_FEES"
+ },
+ {
+  "id": "MAC_FEES_transfere_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "COMISION TRANSFERE",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Gastos y comisiones Bancarias",
+  "regla_esperada": "MAC_FEES"
+ },
+ {
+  "id": "MAC_FEES_mantenimiento_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D MANTENIMIENTO MENSUAL PAQUETE",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Gastos y comisiones Bancarias",
+  "regla_esperada": "MAC_FEES"
+ },
+ {
+  "id": "MAC_FEES_valores_v2",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macrov2",
+   "descripcion": "COMISION ADM.VALORES AL $",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Gastos y comisiones Bancarias",
+  "regla_esperada": "MAC_FEES"
+ },
+ {
+  "id": "MAC_FCI_susc_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "10 Liq.Susc 10000001 214714 SUC.: 811",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Fondo comun de Inversion",
+  "regla_esperada": "MAC_FCI"
+ },
+ {
+  "id": "MAC_FCI_sol_resc_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "10 Sol.Resc 10000002 SUC.: 811",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Fondo comun de Inversion",
+  "regla_esperada": "MAC_FCI"
+ },
+ {
+  "id": "MAC_FCI_liq_resc_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "Liq.Resc 10000003 SUC.: 811",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Fondo comun de Inversion",
+  "regla_esperada": "MAC_FCI"
+ },
+ {
+  "id": "MAC_ARCA_aportes_ss",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "APORTES SEG SOCIAL",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Pago Arca",
+  "regla_esperada": "MAC_ARCA_SOCIAL"
+ },
+ {
+  "id": "MAC_ARCA_contrib_os",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "CONTRIB OBRA SOCIAL",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Pago Arca",
+  "regla_esperada": "MAC_ARCA_SOCIAL"
+ },
+ {
+  "id": "MAC_ARCA_credito_revision",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "APORTES SEG SOCIAL",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": "MAC_ARCA_SOCIAL_CREDIT_REVIEW"
+ },
+ {
+  "id": "MAC_ART_sin_regla",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "ART",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": null
+ },
+ {
+  "id": "MAC_SVC_sin_regla",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "SVC",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": null
+ },
+ {
+  "id": "MAC_PROPIA_aut_cr",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/C CR TRANS AUT SDO",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": "MAC_OWN_TRANSFER_REVIEW"
+ },
+ {
+  "id": "MAC_PROPIA_aut_db",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D DB TR AUT SDO",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": "MAC_OWN_TRANSFER_REVIEW"
+ },
+ {
+  "id": "MAC_PROPIA_fv_aut",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D FV DB TRANSF AUT SDO",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": "MAC_OWN_TRANSFER_REVIEW"
+ },
+ {
+  "id": "MAC_PROPIA_mtit",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/C CR TRAN. $ M/TIT. MD CA A CC",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": "MAC_OWN_TRANSFER_REVIEW"
+ },
+ {
+  "id": "MAC_PROPIA_mismo_titular",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D TRANSFERENCIA MISMO TITULAR",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": "MAC_OWN_TRANSFER_REVIEW"
+ },
+ {
+  "id": "MAC_PROPIA_compensacion",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/C COMPENSACION ENTRE TUS CUENTAS",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": "MAC_OWN_TRANSFER_REVIEW"
+ },
+ {
+  "id": "MAC_PROPIA_v2",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macrov2",
+   "descripcion": "DB TR..AUT.SDO.MISMO TIT. $",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": "MAC_OWN_TRANSFER_REVIEW"
+ },
+ {
+  "id": "MAC_DATANET_db",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D TEF DATANET PAGOS AFIP 12345678",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": "MAC_DATANET_TAX_REVIEW"
+ },
+ {
+  "id": "MAC_DATANET_cr",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D TEF DATANET PAGOS AFIP 12345678",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": "MAC_DATANET_TAX_REVIEW"
+ },
+ {
+  "id": "MAC_PAGO_macronline_v1",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D Transf. MacrOnline E-set D/T 12345678",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Proveedores",
+  "regla_esperada": "MAC_PAYMENTS"
+ },
+ {
+  "id": "MAC_PAGO_macronline_v2",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macrov2",
+   "descripcion": "Transf. MacrOnline E-set M/T $",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Proveedores",
+  "regla_esperada": "MAC_PAYMENTS"
+ },
+ {
+  "id": "MAC_PAGO_id_cuit",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "TRANSF:2401030000000000000001-20111111112",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Proveedores",
+  "regla_esperada": "MAC_PAYMENTS"
+ },
+ {
+  "id": "MAC_PAGO_ccdo",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "TRF MO CCDO DIST T - 30123456789",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Proveedores",
+  "regla_esperada": "MAC_PAYMENTS_OTHER_HOLDER"
+ },
+ {
+  "id": "MAC_PAGO_minorista",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D DB TRANSF MINORISTA DIST TIT 12345678",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Proveedores",
+  "regla_esperada": "MAC_PAYMENTS_OTHER_HOLDER"
+ },
+ {
+  "id": "MAC_PAGO_ccdo_con_perfil",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "TRF MO CCDO DIST T - 30123456789",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {
+   "cuits_propios": [
+    "30123456789"
+   ]
+  },
+  "detalle_esperado": "Proveedores",
+  "regla_esperada": "MAC_PAYMENTS_OTHER_HOLDER"
+ },
+ {
+  "id": "MAC_PAGO_id_cuit_propio_con_perfil",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "TRANSF:2401030000000000000001-30123456789",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {
+   "cuits_propios": [
+    "30123456789"
+   ]
+  },
+  "detalle_esperado": "Transferencia entre cuentas",
+  "regla_esperada": "COMMON_OWN_ID"
+ },
+ {
+  "id": "MAC_TRANSF_var_sin_regla",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "TRANSF 20111111112 VAR",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": null
+ },
+ {
+  "id": "MAC_VENTA_tarjeta",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "PAGO12345678-LIQ COMER PRISMA",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Deudores por venta",
+  "regla_esperada": "COMMON_RESIDUAL_CREDIT"
+ },
+ {
+  "id": "MAC_VENTA_transferencia",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "TRANSF EMPRESA EJEMPLO 20111111112 VAR VARIOS",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Deudores por venta",
+  "regla_esperada": "COMMON_RESIDUAL_CREDIT"
+ },
+ {
+  "id": "MAC_TARJETA_debito_sin_regla",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "PAGO12345678-LIQ COMER PRISMA",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": null
+ },
+ {
+  "id": "MAC_AFIP_sin_regla",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "AFIP 12345678",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": null
+ },
+ {
+  "id": "MAC_SELLOS_sin_regla",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "N/D DGR SELLOS CORDOBA",
+   "debito": "1000.50",
+   "credito": null
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": null
+ },
+ {
+  "id": "MAC_CAJA_v2",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macrov2",
+   "descripcion": "DEPOSITO EN EFECTIVO CTA $",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "Caja",
+  "regla_esperada": "COMMON_CASH_EXPLICIT"
+ },
+ {
+  "id": "MAC_SALDO_no_es_movimiento",
+  "tipo": "sintetico",
+  "movimiento": {
+   "banco": "macro",
+   "descripcion": "SALDO FINAL DEL DIA",
+   "debito": null,
+   "credito": "1000.50"
+  },
+  "config_cliente": {},
+  "detalle_esperado": "#N/D",
+  "regla_esperada": null
+ }
+]

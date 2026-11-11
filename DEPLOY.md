@@ -14,12 +14,12 @@ instalan nada.
 > **Nota técnica (ya resuelta):** la app necesita **dos** `pdftotext` distintos
 > y no son intercambiables:
 >
-> - **Xpdf** para el modo `-table` (Galicia, Santander, Bancor, BBVA, Nación y
->   MacroV2). Poppler no tiene esa opción, por eso el binario de Xpdf para Linux
->   viene incluido en `bin/pdftotext`.
-> - **Poppler** para el modo `-layout` (MacroV1). El `-layout` de Xpdf pierde la
->   columna de importes en buena parte de las filas de Macro, así que Macro no
->   reconciliaba. Poppler se instala en el servidor vía `packages.txt`
+> - **Xpdf** para el modo `-table`, que usan todos los bancos (MacroV1 incluido
+>   desde noviembre de 2026). Poppler no tiene esa opción, por eso el binario de
+>   Xpdf para Linux viene incluido en `bin/pdftotext`.
+> - **Poppler** para el modo `-layout`, como respaldo de MacroV1: si con
+>   `-table` el saldo no encadena, se prueba Poppler, con el que reconciliaban
+>   extractos MacroV1 anteriores. Se instala en el servidor vía `packages.txt`
 >   (`poppler-utils`).
 >
 > En Windows, Poppler sale del PATH y para Xpdf la app busca `bin/pdftotext.exe`

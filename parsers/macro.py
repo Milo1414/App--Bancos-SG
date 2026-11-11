@@ -5,13 +5,21 @@
 #  Formato de tabla:
 #     FECHA | DESCRIPCION | REFERENCIA | DEBITOS | CREDITOS | SALDO
 #
-#  Las posiciones de las columnas NO se hardcodean: se leen de la línea de
-#  encabezado ("FECHA ... DEBITOS ... CREDITOS ... SALDO") que Macro repite en
-#  cada página. Los importes vienen alineados a la derecha, así que cada monto
-#  se asigna a la columna cuyo borde derecho le queda más cerca. Gracias a eso
-#  el parser funciona igual con el `-layout` de Xpdf (el binario que usa el
-#  servidor) que con el de Poppler (desarrollo local en Windows), que ubican el
-#  texto en columnas distintas.
+#  Motor: primero `pdftotext -table` de Xpdf. En los extractos de 2026, el
+#  `-layout` (de Xpdf o de Poppler) sale desarmado: los importes quedan en
+#  líneas aparte y corridos respecto de su fila. Con `-table` cada fila trae
+#  completa su fecha, su descripción, su importe y su saldo.
+#  Respaldo: extractos anteriores reconciliaban con el `-layout` de Poppler.
+#  Si con `-table` quedan líneas descartadas o el saldo no encadena, se prueba
+#  Poppler y se queda el resultado con menos problemas.
+#
+#  Dirección (débito o crédito): `-table` no respeta la columna de cada fila
+#  (un mismo importe puede quedar más a la izquierda o más a la derecha según
+#  la página), así que la dirección se decide por el SALDO: si el saldo de la
+#  fila es el anterior más el importe es un crédito; si es el anterior menos
+#  el importe, un débito. Sólo cuando esa cuenta no cierra (falta el saldo
+#  anterior o el banco imprimió el día en otro orden) se usa la posición del
+#  importe respecto del encabezado "FECHA ... DEBITOS ... CREDITOS ... SALDO".
 #
 #  Un mismo PDF trae VARIAS cuentas (ej. "CUENTA CORRIENTE ESPECIAL EN PESOS",
 #  "CUENTA CORRIENTE BANCARIA" y la de DOLARES). Cada movimiento se etiqueta
@@ -25,7 +33,10 @@ from parsers import registrar_parser
 
 
 # "CUENTA CORRIENTE ESPECIAL EN PESOS NRO.: 4-399-0950295930-2"
-_RE_CUENTA = re.compile(r"^\s*(CUENTA\s+.*?)\s+NRO\.:\s+(\S+)", re.IGNORECASE)
+# "CAJA DE AHORRO EN PESOS NRO.: 4-399-0000000001-1"
+_RE_CUENTA = re.compile(r"^\s*((?:CUENTA|CAJA\s+DE\s+AHORROS?)\s+.*?)\s+NRO\.:\s+(\S+)",
+                        re.IGNORECASE)
+_TOLERANCIA = 0.011  # centavos de redondeo al comparar saldos
 _RE_SALDO_ULT = re.compile(r"SALDO\s+ULTIMO\s+EXTRACTO\s+AL\s+\d{2}/\d{2}/\d{4}", re.IGNORECASE)
 _RE_FECHA = re.compile(r"^\s*(\d{2}/\d{2}/\d{2})\s")
 _RE_NUM = re.compile(r"-?\d{1,3}(?:\.\d{3})*,\d{2}")
@@ -47,7 +58,32 @@ def _columnas(line: str):
 
 @registrar_parser("macro")
 def parser_macro(pdf_path: str) -> tuple:
-    text = pdf_to_text(pdf_path, layout=True)
+    resultado = _parsear_texto(pdf_to_text(pdf_path, table=True))
+    problemas = _problemas(*resultado)
+    if problemas:
+        try:
+            respaldo = _parsear_texto(pdf_to_text(pdf_path, layout=True))
+        except (OSError, RuntimeError):
+            return resultado  # sin Poppler: queda el resultado de Xpdf
+        if _problemas(*respaldo) < problemas:
+            return respaldo
+    return resultado
+
+
+def _problemas(movimientos, diagnostico) -> int:
+    """Líneas descartadas + filas cuyo saldo no encadena con la anterior de su cuenta."""
+    saltos = 0
+    anterior = {}
+    for m in movimientos:
+        base = anterior.get(m["cuenta"], m.get("saldo_inicial"))
+        if base is not None and m["saldo"] is not None and abs(
+                base + (m["credito"] or 0) - (m["debito"] or 0) - m["saldo"]) > _TOLERANCIA:
+            saltos += 1
+        anterior[m["cuenta"]] = m["saldo"]
+    return len(diagnostico.lineas_descartadas) + saltos
+
+
+def _parsear_texto(text: str) -> tuple:
     lines = text.split("\n")
     movimientos = []
     diagnostico = Diagnostico(total_lineas=len(lines))
@@ -111,18 +147,33 @@ def parser_macro(pdf_path: str) -> tuple:
             })
             continue
 
-        # Cada monto cae en la columna cuyo borde derecho tiene más cerca.
         debito = credito = saldo = None
-        for fin, raw in montos:
-            val = parse_num(raw)
-            if val is None:
-                continue
-            if fin > corte_cred_saldo:
-                saldo = val
-            elif fin > corte_deb_cred:
-                credito = abs(val)
+        anterior = ultimo_saldo.get(cuenta_activa, saldo_ini_por_cuenta.get(cuenta_activa))
+        valores = [parse_num(raw) for _, raw in montos]
+        if len(valores) >= 2 and None not in valores[-2:] and anterior is not None:
+            # Importe + saldo: el saldo dice la dirección.
+            importe, saldo = abs(valores[-2]), valores[-1]
+            delta = saldo - anterior
+            if abs(delta - importe) <= _TOLERANCIA:
+                credito = importe
+            elif abs(delta + importe) <= _TOLERANCIA:
+                debito = importe
             else:
-                debito = abs(val)
+                saldo = None  # no cierra: se decide por posición
+
+        if debito is None and credito is None:
+            # Respaldo: cada monto cae en la columna cuyo borde derecho tiene más cerca.
+            saldo = None
+            for fin, raw in montos:
+                val = parse_num(raw)
+                if val is None:
+                    continue
+                if fin > corte_cred_saldo:
+                    saldo = val
+                elif fin > corte_deb_cred:
+                    credito = abs(val)
+                else:
+                    debito = abs(val)
 
         if debito is None and credito is None:
             diagnostico.lineas_descartadas.append({

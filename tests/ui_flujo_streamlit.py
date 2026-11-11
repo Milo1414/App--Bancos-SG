@@ -108,9 +108,9 @@ def main():
                 expect(caja_hoja(hoja)).to_contain_text(f"{pend[hoja]} filas #N/D")
                 expect(caja_hoja(hoja)).not_to_contain_text("Perfil")
 
-            # 3) Macro avisa que no tiene reglas
+            # 3) Macro ya tiene reglas: el aviso de "sin reglas" no aparece
             elegir_banco("MacroV2")
-            expect(page.get_by_text("todavía no hay reglas de categorización")).to_be_visible()
+            expect(page.get_by_text("todavía no hay reglas de categorización")).to_have_count(0)
 
             # 4) Nombre del archivo + descarga del Excel
             nombre = page.get_by_label("Nombre del archivo Excel")

@@ -17,14 +17,14 @@ from dataclasses import dataclass, field
 #
 #   · `-table`  → sólo existe en **Xpdf**. Es el que alinea bien las columnas
 #                 Débito/Crédito/Saldo de Galicia, Santander, Bancor, BBVA,
-#                 Nación y MacroV2. En Linux se usa el binario incluido en el
-#                 repo (bin/pdftotext), porque el pdftotext de Poppler que
-#                 traen los servidores no soporta `-table`.
+#                 Nación, MacroV2 y MacroV1. En Linux se usa el binario
+#                 incluido en el repo (bin/pdftotext), porque el pdftotext de
+#                 Poppler que traen los servidores no soporta `-table`.
 #
-#   · `-layout` → se usa **Poppler**. El `-layout` de Xpdf, sobre los extractos
-#                 de MacroV1, directamente PIERDE la columna de importes en
-#                 buena parte de las filas (se queda sólo con el saldo), así
-#                 que Macro no reconcilia. El de Poppler los conserva.
+#   · `-layout` → se usa **Poppler**, sólo como respaldo de MacroV1: si con
+#                 `-table` el saldo no encadena, se prueba Poppler (extractos
+#                 MacroV1 anteriores reconciliaban así). El `-layout` de Xpdf
+#                 pierde la columna de importes en esos extractos.
 #
 #  Por eso cada modo resuelve su propio ejecutable en vez de compartir uno.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -105,8 +105,8 @@ def pdf_to_text(pdf_path: str, layout: bool = True, table: bool = False) -> str:
 
     modo:
       - table=True   → 'pdftotext -table' con Xpdf (Galicia, Santander, Bancor,
-                       BBVA, Nación, MacroV2).
-      - layout=True  → 'pdftotext -layout' con Poppler (MacroV1).
+                       BBVA, Nación, MacroV2 y MacroV1).
+      - layout=True  → 'pdftotext -layout' con Poppler (respaldo de MacroV1).
     """
     args = [_pdftotext_cmd(table=table)]
     if table:

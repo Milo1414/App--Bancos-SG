@@ -23,7 +23,8 @@
     "BBVA",
     "Santander",
     "Nacion",
-    "Bancor"
+    "Bancor",
+    "Macro"
   ],
   "normalization": {
     "unicode": "NFKD + retirar marcas diacríticas",
@@ -1113,6 +1114,229 @@
       ],
       "predicate": null,
       "note": "Reverso de un pago de haberes o AFIP sin regla de devolución validada: pendiente. 'ANUL' no lo cubre el bloqueo genérico de reversos (ANULACION)."
+    },
+    {
+      "id": "MAC_TAX_25413",
+      "bank": "Macro",
+      "priority": 10,
+      "detalle": "imp 25.413",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:N [DC] )?(?:FV )?(?:IMP)?DBCR 25413\\b"
+      ],
+      "predicate": null,
+      "note": "Débitos y créditos de la Ley 25413 (S/DB y S/CR), también sus notas de crédito. MacroV2 imprime el mismo texto sin el prefijo N/D."
+    },
+    {
+      "id": "MAC_IIBB",
+      "bank": "Macro",
+      "priority": 15,
+      "detalle": "Retencion IIBB",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:N [DC] )?RETENCION (?:ING BRUTOS|IIBB) CORDOBA\\b"
+      ],
+      "predicate": null,
+      "note": "Retenciones de Ingresos Brutos Córdoba, incluida la de renta financiera."
+    },
+    {
+      "id": "MAC_IVA_PER",
+      "bank": "Macro",
+      "priority": 20,
+      "detalle": "Iva Percepcion",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^RETENCION IVA PERCEPCION\\b"
+      ],
+      "predicate": null,
+      "note": ""
+    },
+    {
+      "id": "MAC_IVA_PER_V2",
+      "bank": "Macro",
+      "priority": 20,
+      "detalle": "Iva Percepcion",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "propuesta_sin_muestras",
+      "description_patterns": [
+        "^DEBITO FISCAL IVA PERCEPCION\\b"
+      ],
+      "predicate": null,
+      "note": "Texto de MacroV2 sin muestra conciliada. Es la misma percepción que MacroV1 imprime como RETENCION IVA PERCEPCION."
+    },
+    {
+      "id": "MAC_IVA_CRED",
+      "bank": "Macro",
+      "priority": 25,
+      "detalle": "Iva Credito",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^DEBITO FISCAL IVA BASICO\\b"
+      ],
+      "predicate": null,
+      "note": "Macro llama DEBITO FISCAL al IVA que cobra sobre sus comisiones; para el cliente es crédito fiscal."
+    },
+    {
+      "id": "MAC_FEES",
+      "bank": "Macro",
+      "priority": 30,
+      "detalle": "Gastos y comisiones Bancarias",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:N [DC] )?COMISION\\b",
+        "^(?:N [DC] )?MANTENIMIENTO\\b"
+      ],
+      "predicate": null,
+      "note": "Comisiones de transferencias y mantenimiento de cuenta."
+    },
+    {
+      "id": "MAC_FCI",
+      "bank": "Macro",
+      "priority": 35,
+      "detalle": "Fondo comun de Inversion",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:\\d+ )?LIQ SUSC\\b",
+        "^(?:\\d+ )?(?:SOL|LIQ) RESC\\b"
+      ],
+      "predicate": null,
+      "note": "Suscripciones y rescates del fondo común de inversión de Macro."
+    },
+    {
+      "id": "MAC_ARCA_SOCIAL",
+      "bank": "Macro",
+      "priority": 40,
+      "detalle": "Pago Arca",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "decision_usuario",
+      "description_patterns": [
+        "^(?:APORTES|CONTRIB) (?:SEG SOCIAL|OBRA SOCIAL)\\b"
+      ],
+      "predicate": null,
+      "note": "Aportes y contribuciones de seguridad social y obra social (F.931), que se pagan a ARCA. ART, seguro de vida y DATANET no entran."
+    },
+    {
+      "id": "MAC_PAYMENTS_OTHER_HOLDER",
+      "bank": "Macro",
+      "priority": 44,
+      "detalle": "Proveedores",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^TRF MO CCDO DIST\\b",
+        "^N D DB TRANSF MINORISTA DIST\\b"
+      ],
+      "predicate": null,
+      "note": "Transferencias a otro titular (DIST). El CUIT que imprime TRF MO CCDO es el del ordenante, o sea el propio titular: por eso esta regla va antes de COMMON_OWN_ID."
+    },
+    {
+      "id": "MAC_ARCA_SOCIAL_CREDIT_REVIEW",
+      "bank": "Macro",
+      "priority": 72,
+      "detalle": "#N/D",
+      "directions": [
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "control_preventivo",
+      "description_patterns": [
+        "^(?:APORTES|CONTRIB) (?:SEG SOCIAL|OBRA SOCIAL)\\b"
+      ],
+      "predicate": null,
+      "note": "Un crédito de aportes o contribuciones no es una venta: se revisa a mano."
+    },
+    {
+      "id": "MAC_OWN_TRANSFER_REVIEW",
+      "bank": "Macro",
+      "priority": 72,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:N [DC] )?(?:FV )?(?:DB|CR) TR(?:ANSF?)? AUT\\b",
+        "\\b(?:MISMO|M) TIT(?:ULAR)?\\b",
+        "^N C COMPENSACION ENTRE TUS CUENTAS\\b"
+      ],
+      "predicate": null,
+      "note": "Movimientos entre cuentas del mismo titular (automáticos de saldo, M/TIT, compensación): el histórico los reparte entre la cuenta propia y 'no imputar'. Sin esta regla el crédito caería en ventas."
+    },
+    {
+      "id": "MAC_DATANET_TAX_REVIEW",
+      "bank": "Macro",
+      "priority": 72,
+      "detalle": "#N/D",
+      "directions": [
+        "Debito",
+        "Credito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^N [DC] TEF DATANET PAGOS\\b"
+      ],
+      "predicate": null,
+      "note": "Pagos DATANET de impuestos: el mismo texto se imputa a IVA (ARCA), a Ingresos Brutos (Rentas Córdoba) o a intereses."
+    },
+    {
+      "id": "MAC_PAYMENTS",
+      "bank": "Macro",
+      "priority": 80,
+      "detalle": "Proveedores",
+      "directions": [
+        "Debito"
+      ],
+      "enabled": true,
+      "status": "observada",
+      "description_patterns": [
+        "^(?:N D )?TRANSF MACRONLINE\\b",
+        "^TRANSF [A-Z0-9]{20,} \\d{11}\\b"
+      ],
+      "predicate": null,
+      "note": "Transferencias enviadas por MacrOnline o con identificador y CUIT del destinatario. Algunas pocas del histórico eran tasas municipales."
     }
   ],
   "evidence_note": "Los ejemplos y conteos de evidencia citan clientes reales y se conservan solo en la copia local (public/conciliaciones_bancarias/). Esta copia tiene las mismas reglas."
