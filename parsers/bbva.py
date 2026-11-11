@@ -81,23 +81,18 @@ def parser_bbva(pdf_path: str) -> tuple:
     fin_extracto  = False
     saldo_ini_por_cuenta = {}  # cuenta → saldo anterior (saldo inicial) informado
 
-    # Sin palabras con tilde ("DÉBITO", "CRÉDITO", "Página"): esta lista también
-    # se aplica a las líneas con fecha, y un movimiento como "PAGO TARJETA DE
-    # CRÉDITO" se perdería. Mientras Xpdf escribía Latin-1 nunca coincidían.
-    SKIP = [
-        "FECHA", "ORIGEN", "CONCEPTO",
-        "SALDO ANTERIOR", "SALDO AL", "TOTAL MOVIMIENTOS",
-        "Sobre (", "Banco BBVA",
-        "Resumen", "Pymes y Negocios", "Cuentas y paquetes",
-        "OCASA", "TIERRA", "PRES HIPOLITO", "DIGITAL", "OCRCU",
-        "Cuenta Pyme", "CONSOLIDADO", "MANTENIMIENTO",
-        "BONIFICACIONES", "Cta.Cte.Bancaria",
-        "Intervinientes", "CBU ", "Sucursal gestora", "DETALLE",
-        "Movimientos en cuentas", "Saldo Consolidado",
-        "Impuesto a los", "TOTAL COBRADO", "TOTAL DEV", "IMP. NETO",
-        "RETENIDO", "El credito de impuesto", "REGIMEN SISTEMA",
-        "Ver Legales",
-    ]
+    # Líneas CON FECHA que no son movimientos. Las líneas sin fecha se descartan
+    # igual más abajo, así que esta es la única lista que filtra.
+    # Antes había una lista larga de encabezados y leyendas ("CBU ",
+    # "MANTENIMIENTO", "DIGITAL", "RETENIDO"…). Como sólo actuaba sobre las
+    # líneas con fecha, descartaba movimientos reales como "TRANSFERENCIA A CBU
+    # …" o "MANTENIMIENTO DE CUENTA", sin contarlos como descartados.
+    # Sin palabras con tilde: el texto llega en UTF-8 y coincidirían.
+    NO_MOVIMIENTO = ["SALDO ANTERIOR", "SALDO AL ", "TOTAL MOVIMIENTOS"]
+
+    # Título de la sección de débitos automáticos rechazados (no se cobraron):
+    # sus filas tienen fecha e importe pero no son movimientos de la cuenta.
+    re_rechazados = re.compile(r"^RECHAZADOS\b|\bMOTIVO RECHAZO\b")
 
     for i, line in enumerate(lines):
         if fin_extracto:
@@ -132,18 +127,22 @@ def parser_bbva(pdf_path: str) -> tuple:
             continue
 
         # Capturar el saldo anterior (saldo inicial) informado por cada cuenta,
-        # antes de que el filtro SKIP descarte la línea.
+        # antes de que el filtro NO_MOVIMIENTO descarte la línea.
         if "SALDO ANTERIOR" in stripped and cuenta_activa not in saldo_ini_por_cuenta:
             nums_sa = re_num.findall(line)
             if nums_sa:
                 saldo_ini_por_cuenta[cuenta_activa] = parse_num(nums_sa[-1])
 
-        # Saltear headers, legales, totales y otras líneas no-movimiento
-        if any(x in stripped for x in SKIP):
-            continue
-
         m = re_fecha.match(line)
         if not m:
+            # Sección de débitos rechazados: lo que sigue no pertenece a la
+            # cuenta hasta el próximo encabezado "CC $ …".
+            if re_rechazados.search(stripped):
+                cuenta_activa = None
+            continue
+
+        # Saldos y totales con fecha: no son movimientos
+        if any(x in stripped for x in NO_MOVIMIENTO):
             continue
 
         fecha_corta = m.group(1)

@@ -651,6 +651,55 @@ class MotoresPdftotext(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+TEXTO_BBVA = "\n".join([
+    "CC $ 267-000000/1 (Cta.Cte.Bancaria) - Iva-Responsable Inscripto",
+    "FECHA   ORIGEN   CONCEPTO                              DÉBITO      CRÉDITO      SALDO",
+    "        SALDO ANTERIOR                                                       10.000,00",
+    # Textos que aparecen en conciliaciones BBVA reales:
+    "02/01   D 733    TRANSFERENCIA A CBU 20111111112       -1.000,00                9.000,00",
+    "03/01   D        MANTENIMIENTO DE CUENTA 06/24           -500,00                8.500,00",
+    "04/01   C        CHEQUE RECHAZADO 48HS NRO 90000742                 300,00      8.800,00",
+    "05/01   D 500    TRANSFERENCIA RECIBIDA                            2.000,00     10.800,00",
+    "        SALDO AL 04 DE JULIO                                                 10.800,00",
+    "        TOTAL MOVIMIENTOS                              -1.500,00   2.300,00",
+    "Débitos automáticos",
+    "RECHAZADOS (información al: 04/07/2024)",
+    "FECHA   EMPRESA   SERVICIO   REFERENCIA   FACTURA   MOTIVO RECHAZO   CUENTA",
+    "18/06   AFIP-DGI PLANRG5321 20111111112 R5321S0000001 SALDO INSUFICIEN   262.391,94   CC $ 267-000000/1",
+    "Transferencias",
+])
+
+
+class ParserBBVA(unittest.TestCase):
+
+    def setUp(self):
+        from parsers import bbva
+        with mock.patch.object(bbva, "pdf_to_text", return_value=TEXTO_BBVA):
+            self.movs, self.diag = bbva.parser_bbva("sintetico.pdf")
+
+    def test_no_pierde_movimientos_reales(self):
+        """«A CBU» y «MANTENIMIENTO» estaban en la lista de líneas a saltear y esos
+        movimientos se perdían sin figurar como descartados."""
+        self.assertEqual([(m["descripcion"], m["debito"], m["credito"], m["saldo"]) for m in self.movs], [
+            ("TRANSFERENCIA A CBU 20111111112", 1000.0, None, 9000.0),
+            ("MANTENIMIENTO DE CUENTA 06/24", 500.0, None, 8500.0),
+            ("C CHEQUE RECHAZADO 48HS NRO 90000742", None, 300.0, 8800.0),
+            ("TRANSFERENCIA RECIBIDA", None, 2000.0, 10800.0),
+        ])
+        self.assertEqual(self.diag.lineas_descartadas, [])
+
+    def test_saldo_anterior_y_saldo_encadenado(self):
+        self.assertTrue(all(m["saldo_inicial"] == 10000.0 for m in self.movs))
+        saldo = Decimal("10000.00")
+        for m in self.movs:
+            saldo += Decimal(str(m["credito"] or 0)) - Decimal(str(m["debito"] or 0))
+            self.assertEqual(saldo, Decimal(str(m["saldo"])).quantize(Decimal("0.01")))
+
+    def test_debitos_rechazados_no_son_movimientos(self):
+        self.assertFalse(any("AFIP-DGI" in m["descripcion"] for m in self.movs))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 class Lotes(unittest.TestCase):
 
     def test_cada_hoja_con_su_banco_y_su_perfil(self):

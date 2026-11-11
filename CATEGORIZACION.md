@@ -185,11 +185,21 @@ Arreglos de integridad que afectan a todos los bancos:
   letra con tilde llegaba como `�` (por ejemplo `Energ�a de C�rdoba`). Ahora se
   pide `-enc UTF-8`. En los once PDF de ejemplo, el único cambio son 7
   descripciones que ahora salen bien; importes, fechas y saldos son idénticos.
-* **BBVA:** su lista de líneas a saltear incluía `DÉBITO`, `CRÉDITO` y
-  `Página`, y se aplica también a los movimientos. Con el texto en UTF-8 esas
-  palabras habrían empezado a coincidir y un movimiento como «PAGO TARJETA DE
-  CRÉDITO» se habría perdido. Se quitaron: antes nunca coincidían, así que BBVA
-  se comporta igual que siempre.
+* **BBVA perdía movimientos reales.** Su lista de líneas a saltear (encabezados
+  y leyendas como `CBU `, `MANTENIMIENTO`, `DIGITAL`, `RETENIDO`) solo tenía
+  efecto sobre las líneas con fecha, porque las demás se descartan igual. Así
+  descartaba movimientos como «TRANSFERENCIA A CBU …» (62 en las conciliaciones
+  BBVA disponibles) o «MANTENIMIENTO DE CUENTA» (12), sin contarlos como
+  descartados. Además, con el texto en UTF-8, `DÉBITO` y `CRÉDITO` habrían
+  empezado a sacar movimientos como «PAGO TARJETA DE CRÉDITO». Ahora, en las
+  líneas con fecha, solo se saltean `SALDO ANTERIOR`, `SALDO AL` y
+  `TOTAL MOVIMIENTOS`. En el PDF BBVA de ejemplo salen los mismos 10
+  movimientos.
+* **BBVA, débitos automáticos rechazados:** las filas de esa sección tienen
+  fecha e importe pero no se cobraron. Se excluían solo porque en el PDF de
+  ejemplo venían después de la cuenta en dólares; si la última cuenta era en
+  pesos, entraban como movimientos. Ahora el título `RECHAZADOS` corta la
+  cuenta activa. Un `CHEQUE RECHAZADO` con fecha sigue siendo un movimiento.
 * **Detección de Poppler:** se reconoce por su `pdftotext -v`, recorriendo todo
   el PATH. Antes se usaba el primer `pdftotext` del PATH aunque fuera Xpdf, y
   MacroV1 perdía importes sin dar error. Si falta Poppler, la app avisa pero no
@@ -232,10 +242,8 @@ Arreglos de integridad que afectan a todos los bancos:
   precisión en extractos nuevos ni es una garantía contable. Los cinco Excel
   originales aparecieron después en `public/Conciliaciones Excels/` (solo
   locales), pero todavía no se usaron para recalcular.
-* **BBVA** (pendiente, anterior a este cambio): la lista de líneas a saltear
-  también se aplica a los movimientos e incluye palabras como `MANTENIMIENTO`,
-  `RETENIDO` o `DIGITAL`. Un movimiento que las contenga se descartaría. En el
-  PDF de ejemplo no pasa; si pasara, se vería como Diferencia distinta de cero.
+* **BBVA** se probó con textos de dos conciliaciones reales (solo locales), no
+  con un PDF nuevo: el único PDF BBVA de ejemplo no tiene esos movimientos.
 * Las reglas de **MacroV2** que no tienen muestra conciliada propia
   (`MAC_IVA_PER_V2` y los textos sin prefijo) se dedujeron de MacroV1.
 * SAN_ARCA solo se probó con texto sintético: los PDF Santander disponibles no
