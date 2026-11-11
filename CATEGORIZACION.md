@@ -198,7 +198,11 @@ Arreglos de integridad que afectan a todos los bancos:
   se instala Poppler con la app abierta, hay que reiniciarla.
 * **Respaldo protegido:** si Poppler dio movimientos con algún problema y
   después Xpdf falla, se devuelve lo de Poppler con su diagnóstico en lugar de
-  perder todo.
+  perder todo. Un resultado de Xpdf sin movimientos nunca reemplaza a uno con
+  movimientos (tendría «0 problemas»). El diagnóstico de la app y el log dicen
+  qué motor produjo cada MacroV1 y por qué.
+* La búsqueda de Poppler ignora las entradas relativas del PATH, que
+  ejecutarían lo que haya en la carpeta actual.
 * Una prueba recorre los textos de los parsers y falla si aparece una palabra
   con tilde en un filtro (solo Galicia las tiene, siempre con su par `�`).
 

@@ -61,17 +61,27 @@ def parser_macro(pdf_path: str) -> tuple:
     except (OSError, RuntimeError):
         resultado = None  # sin Poppler: sólo queda Xpdf
     if resultado is not None and resultado[0] and not _problemas(*resultado):
-        return resultado
+        return _con_motor(resultado, "Poppler -layout")
     # Sin Poppler, sin movimientos o con problemas: se prueba Xpdf `-table`.
     try:
         respaldo = _parsear_texto(pdf_to_text(pdf_path, table=True))
-    except (OSError, RuntimeError):
+    except (OSError, RuntimeError) as e:
         if resultado is not None and resultado[0]:
-            return resultado  # Xpdf falló: queda Poppler, con su diagnóstico
+            primera = (str(e).splitlines() or [type(e).__name__])[0]
+            return _con_motor(resultado, f"Poppler -layout (Xpdf -table falló: {primera})")
         raise
     if resultado is None or not resultado[0]:
-        return respaldo
-    return respaldo if _problemas(*respaldo) < _problemas(*resultado) else resultado
+        motivo = "sin Poppler" if resultado is None else "Poppler no encontró movimientos"
+        return _con_motor(respaldo, f"Xpdf -table ({motivo})")
+    # Un respaldo vacío nunca reemplaza movimientos: tendría "0 problemas".
+    if respaldo[0] and _problemas(*respaldo) < _problemas(*resultado):
+        return _con_motor(respaldo, "Xpdf -table (menos problemas que Poppler)")
+    return _con_motor(resultado, "Poppler -layout (Xpdf no mejoró el resultado)")
+
+
+def _con_motor(resultado, motor):
+    resultado[1].motor = motor
+    return resultado
 
 
 def _problemas(movimientos, diagnostico) -> int:

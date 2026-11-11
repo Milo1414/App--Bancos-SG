@@ -117,8 +117,11 @@ def _pdftotext_en_path() -> list:
     nombre = "pdftotext.exe" if sys.platform.startswith("win") else "pdftotext"
     rutas = []
     for carpeta in os.environ.get("PATH", "").split(os.pathsep):
-        ruta = os.path.join(carpeta.strip('"'), nombre)
-        if carpeta and os.path.isfile(ruta) and ruta not in rutas:
+        carpeta = carpeta.strip('"')
+        if not carpeta or not os.path.isabs(carpeta):
+            continue  # una entrada relativa ejecutaría lo que haya en la carpeta actual
+        ruta = os.path.join(carpeta, nombre)
+        if os.path.isfile(ruta) and ruta not in rutas:
             rutas.append(ruta)
     return rutas
 
@@ -241,6 +244,7 @@ class Diagnostico:
     lineas_con_fecha: int = 0
     movimientos_parseados: int = 0
     lineas_descartadas: list = field(default_factory=list)
+    motor: str = ""  # qué pdftotext produjo el resultado, cuando el parser elige (MacroV1)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

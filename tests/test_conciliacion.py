@@ -13,6 +13,7 @@ import hashlib
 import io
 import json
 import math
+import os
 import re
 import subprocess
 import sys
@@ -473,6 +474,27 @@ class ParserMacroV1(unittest.TestCase):
         self.assertEqual(len(llamadas), 2)
         self.assertEqual(len(movs), 4)
 
+    def test_respaldo_vacio_no_reemplaza_movimientos(self):
+        # Poppler con un salto de saldo y Xpdf sin movimientos ("0 problemas"):
+        # se quedan las filas de Poppler.
+        movs, _ = self._parsear({"layout": TEXTO_MACROV1, "table": ""})
+        self.assertEqual(len(movs), 4)
+
+    def test_diagnostico_dice_que_motor_se_uso(self):
+        from parsers import macro
+        limpio = "\n".join(l for l in TEXTO_MACROV1.split("\n") if "LIQ COMER" not in l)
+        casos = [({"layout": limpio, "table": ""}, "Poppler -layout"),
+                 ({"layout": "", "table": limpio}, "Xpdf -table (Poppler no encontró movimientos)"),
+                 ({"layout": TEXTO_MACROV1, "table": limpio}, "Xpdf -table (menos problemas que Poppler)"),
+                 ({"layout": TEXTO_MACROV1, "table": TEXTO_MACROV1},
+                  "Poppler -layout (Xpdf no mejoró el resultado)")]
+        for textos, esperado in casos:
+            with self.subTest(esperado), mock.patch.object(
+                    macro, "pdf_to_text",
+                    side_effect=lambda r, layout=True, table=False, t=textos: t["table" if table else "layout"]):
+                _, diag = macro.parser_macro("sintetico.pdf")
+                self.assertEqual(diag.motor, esperado)
+
     def test_si_xpdf_falla_queda_poppler(self):
         def falso(ruta, layout=True, table=False):
             if table:
@@ -549,6 +571,15 @@ class MotoresPdftotext(unittest.TestCase):
                 self.utils._cmd_layout()
             self.assertEqual(self.utils.motores_faltantes(), ["poppler"])
 
+    def test_path_relativo_no_se_ejecuta(self):
+        u = self.utils
+        absoluta = str(RAIZ / "bin")
+        path = os.pathsep.join(["bin", ".", "", absoluta])
+        with mock.patch.dict(u.os.environ, {"PATH": path}), \
+                mock.patch.object(u.os.path, "isfile", return_value=True):
+            rutas = u._pdftotext_en_path()
+        self.assertEqual([os.path.dirname(r) for r in rutas], [absoluta])
+
     def test_falta_de_poppler_se_recuerda(self):
         a, b, c, d = self._con_binarios(["/git/pdftotext"], set())
         with a as en_path, b, c, d:
@@ -568,19 +599,27 @@ class MotoresPdftotext(unittest.TestCase):
         """Con UTF-8, una palabra con tilde en un filtro empezaría a coincidir y podría
         descartar movimientos. Sólo Galicia las tiene, y siempre con su par «�»."""
         import ast
+
+        def comparados(arbol):
+            """Textos que se usan para comparar: listas/tuplas/conjuntos de filtros,
+            `"x" in línea` y argumentos de startswith/endswith/find/index/count."""
+            for n in ast.walk(arbol):
+                if isinstance(n, (ast.List, ast.Tuple, ast.Set)):
+                    yield from n.elts
+                elif isinstance(n, ast.Compare) and any(isinstance(o, (ast.In, ast.NotIn)) for o in n.ops):
+                    yield n.left
+                elif (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                      and n.func.attr in ("startswith", "endswith", "find", "index", "count")):
+                    yield from n.args
+
         encontrados = {}
         for ruta in sorted((RAIZ / "parsers").glob("*.py")):
-            arbol = ast.parse(ruta.read_text(encoding="utf-8"))
-            docs = {id(n.body[0].value) for n in ast.walk(arbol)
-                    if isinstance(n, (ast.Module, ast.FunctionDef, ast.ClassDef)) and n.body
-                    and isinstance(n.body[0], ast.Expr) and isinstance(n.body[0].value, ast.Constant)}
-            for n in ast.walk(arbol):
-                if (isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs
+            for n in comparados(ast.parse(ruta.read_text(encoding="utf-8"))):
+                if (isinstance(n, ast.Constant) and isinstance(n.value, str)
                         and any(ord(ch) > 127 for ch in n.value)):
                     encontrados.setdefault(ruta.name, set()).add(n.value)
         galicia = encontrados.pop("galicia.py")
-        # Mensajes de diagnóstico, no filtros de texto:
-        self.assertEqual(encontrados, {"macro.py": {"sin débito ni crédito"}})
+        self.assertEqual(encontrados, {})
         for texto in galicia - {t for t in galicia if "�" in t}:
             par = "".join("�" if ord(ch) > 127 else ch for ch in texto)
             self.assertIn(par, galicia, texto)

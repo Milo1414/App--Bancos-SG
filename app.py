@@ -340,6 +340,7 @@ def main():
                             f"📊 Diagnóstico ({nombre_archivo}): {total} líneas · "
                             f"{con_fecha} con fecha · {parseados} movimientos · "
                             f"{descartadas} descartadas ({porcentaje:.1f}%)"
+                            + (f" · motor: {diag.motor}" if getattr(diag, "motor", "") else "")
                         )
 
                         if porcentaje > 5.0:
@@ -367,6 +368,8 @@ def main():
                         log_lines.append(f"Líneas con fecha: {con_fecha}")
                         log_lines.append(f"Movimientos parseados: {parseados}")
                         log_lines.append(f"Líneas descartadas: {descartadas} ({porcentaje:.1f}%)")
+                        if getattr(diag, "motor", ""):
+                            log_lines.append(f"Motor: {diag.motor}")
                         log_lines.append("")
                         if diag.lineas_descartadas:
                             log_lines.append("Líneas descartadas:")
